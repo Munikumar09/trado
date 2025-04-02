@@ -1,0 +1,5 @@
+outs:
+- md5: c1d278bfd69ec2693f90dc9c0552e8d8
+  size: 327857660
+  hash: md5
+  path: banknifty.csv.tar.bz2

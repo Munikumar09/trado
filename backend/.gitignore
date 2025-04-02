@@ -1,0 +1,12 @@
+__pycache__
+*.tar.bz2
+.vscode
+*.coverage
+*.log
+*.sqlite3
+*outputs
+.DS_Store
+.env
+postgres_data
+pgadmin_data
+kafka1_data

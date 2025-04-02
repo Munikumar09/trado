@@ -1,0 +1,7 @@
+defaults:
+  - _self_
+  - /streaming: kafka
+
+name: sqlite_saver
+source: $kafka
+sqlite_db: ${oc.env:ROOT_PATH}/app/data_layer/database/db/sqlite/sqlite_db

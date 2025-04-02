@@ -1,0 +1,7 @@
+defaults:
+  - _self_
+  - /streaming: kafka
+
+name: csv_saver
+source: $kafka
+csv_file_path: ${oc.env:ROOT_PATH}/app/data_layer/database/db/csv_saver.csv

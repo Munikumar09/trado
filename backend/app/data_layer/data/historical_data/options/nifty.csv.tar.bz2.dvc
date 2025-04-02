@@ -1,0 +1,5 @@
+outs:
+- md5: b832c2c2ad134f0f12ba8bd69aea80b6
+  size: 340816214
+  hash: md5
+  path: nifty.csv.tar.bz2

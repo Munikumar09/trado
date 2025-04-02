@@ -1,0 +1,17 @@
+defaults:
+  - _self_
+  - websocket_connection@smartsocket_connection: smartsocket_connection
+  - websocket_connection@uplinksocket_connection: uplinksocket_connection
+
+connections:
+  - name: smartsocket_connection
+    connection: ${smartsocket_connection}
+  - name: uplinksocket_connection
+    connection: ${uplinksocket_connection}
+
+
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .

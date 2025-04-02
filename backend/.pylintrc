@@ -1,0 +1,8 @@
+[MASTER]
+disable=  C0114, E0611, R0903, W0621, E0401, R0801, W0718
+         # missing-module-docstring, no-name-in-module, missing-class-docstring, edefined-outer-name, import error, Similar lines, broad-exception-caught
+
+
+[FORMAT]
+max-line-length=130
+max-args=10

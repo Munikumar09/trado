@@ -1,0 +1,130 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+name: Quality Checks
+
+env:
+  PYTHON_VERSION: 3.12.3
+  POETRY_VERSION: 1.8.2
+
+  # Postgres credentials for the test database
+  POSTGRES_USER: ${{ secrets.TEST_DB_USER }}
+  POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+  POSTGRES_DB: ${{ secrets.TEST_DB_NAME }}
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: 5432
+
+  # Brevo credentials
+  BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
+  BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
+  BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+
+  # JWT credentials
+  JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+  JWT_REFRESH_SECRET_KEY: ${{ secrets.JWT_REFRESH_SECRET_KEY }}
+  JWT_HASHING_ALGO: ${{ secrets.JWT_HASHING_ALGO }}
+  
+  # Snowflake credentials
+  MACHINE_ID: ${{ secrets.MACHINE_ID }}
+
+  # SmartAPI credentials
+  SMARTAPI_API_KEY: ${{ secrets.SMARTAPI_API_KEY }}
+  SMARTAPI_CLIENT_ID: ${{ secrets.SMARTAPI_CLIENT_ID }}
+  SMARTAPI_PWD: ${{ secrets.SMARTAPI_PWD }}
+  SMARTAPI_TOKEN: ${{ secrets.SMARTAPI_TOKEN }}
+
+  # Redis credentials
+  REDIS_HOST: ${{ secrets.REDIS_HOST }}
+  REDIS_PORT: ${{ secrets.REDIS_PORT }}
+  REDIS_DB: ${{ secrets.REDIS_DB }}
+  
+on:
+  pull_request:
+    branches: [ "master" ]
+
+
+permissions:
+  contents: read
+
+jobs:
+  # This job sets up the Python environment
+  static:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    defaults:
+
+      run:
+        shell: bash -l {0}
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Miniconda and Create Environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          activate-environment: app
+
+      # Install poetry and all the packages in pyproject.toml file
+      - name: Install poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }} -y
+          ./backend/scripts/setup --cli
+
+      - name: Python Format Check
+        run: ./dev_tools/code_analysis/backend/format.sh --check
+
+      - name: Lint Check
+        run: ./dev_tools/code_analysis/backend/lint.sh
+      
+        
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+        working-directory: backend
+    # Services to be used in the job
+    services:
+      # PostgreSQL service alias
+      postgres:
+        image: postgres:17  # Use a specific version for consistency
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Set up Environment Variable
+        run: echo "APP=app" >> "$GITHUB_ENV"
+
+      - name: Install Miniconda and Create Environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          activate-environment: ${{ env.APP }}
+
+      # Install poetry and all the packages in pyproject.toml file
+      - name: Install Poetry and Dependencies
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 - --version ${{ env.POETRY_VERSION }} -y
+          ./scripts/setup --cli
+
+      - name: Verify PostgreSQL Connection
+        run: |
+          PGPASSWORD=${{ env.POSTGRES_PASSWORD }} psql -h ${{ env.POSTGRES_HOST }} -U ${{ env.POSTGRES_USER }} -d ${{ env.POSTGRES_DB }} -c "SELECT 1;"
+        continue-on-error: false  # Fail if PostgreSQL is not ready
+      - name: Run Tests
+        run: pytest . -vvv

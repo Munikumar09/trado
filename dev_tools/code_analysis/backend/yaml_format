@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""
+This script formats or checks the formatting of YAML files using ruamel.yaml.
+
+Usage:
+    python yaml_format.py [--check] [--all]
+
+Options:
+    --check: Check YAML formatting without modifying files.
+    --all: Overwrite file with formatted output.
+
+Default behavior is to format only the YAML files that have been changed in the Git staging area.
+"""
+import subprocess
+import sys
+import os
+import argparse
+from app import ROOT_DIR
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
+import logging
+from pathlib import Path
+from tabulate import tabulate
+from io import StringIO
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(Path(__file__).name)
+
+
+def find_all_yaml_files(root_dir: str | Path) -> list[str]:
+    """
+    Recursively finds all YAML files from the root directory.
+
+    Parameters
+    ----------
+    root_dir: ``str | Path``
+        The root directory to search for YAML files
+
+    Returns
+    -------
+    yaml_files: ``list[str]``
+        A list of YAML files found in the root directory and its subdirectories
+    """
+    yaml_files = []
+
+    for root, _, files in os.walk(root_dir):
+        for file in files:
+            if file.endswith((".yaml", ".yml")):
+                yaml_files.append(os.path.join(root, file))
+
+    return yaml_files
+
+
+def get_changed_yaml_files():
+    """
+    Gets a list of changed YAML files in the Git staging area.
+
+    Returns
+    -------
+    files: ``list[str]``
+        A list of changed YAML files in the Git staging area
+    """
+    try:
+        output = subprocess.check_output(
+            ["git", "diff", "--name-only", "--diff-filter=ACM"], text=True
+        )
+        files = output.strip().splitlines()
+        files = [
+            f"{ROOT_DIR.parent.parent}/{f}"
+            for f in files
+            if f.endswith((".yaml", ".yml"))
+        ]
+
+        return files
+
+    except subprocess.CalledProcessError:
+        return []
+
+
+def represent_none(self, _):
+    return self.represent_scalar("tag:yaml.org,2002:null", "null")
+
+
+def format_yaml_file(file_path: str | Path) -> bool:
+    """
+    Formats a single YAML file using ruamel.yaml.
+
+    Parameters
+    ----------
+    file_path: ``str | Path``
+        The path to the YAML file to format
+
+    Returns
+    -------
+    ``bool``
+        True if the file was successfully formatted, False otherwise
+    """
+    try:
+        yaml = YAML()
+        yaml.indent(mapping=2, sequence=4, offset=2)
+        yaml.width = 80
+
+        yaml.representer.add_representer(type(None), represent_none)
+
+        with open(file_path, "r") as f:
+            data = yaml.load(f)
+
+        with open(file_path, "w") as f:
+            yaml.dump(data, f)
+
+        return True
+    except YAMLError as e:
+        logger.error(f"Error parsing YAML in {file_path}: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Error formatting {file_path}: {e}")
+        return False
+
+
+def check_yaml_format(file_path: str | Path) -> bool:
+    """
+    Checks the format of a single YAML file using ruamel.yaml.
+
+    Parameters
+    ----------
+    file_path: ``str | Path``
+        The path to the YAML file to check
+
+    Returns
+    -------
+    ``bool``
+        True if the file is correctly formatted, False otherwise
+    """
+    yaml = YAML()
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    yaml.representer.add_representer(type(None), represent_none)
+
+    try:
+        with open(file_path, "r") as f:
+            original_data = f.read()
+            data = yaml.load(original_data)
+
+        formatted_output = StringIO()
+        yaml.dump(data, formatted_output)
+
+        if original_data.strip() != formatted_output.getvalue().strip():
+            return False
+
+        return True
+    except (YAMLError, ValueError) as e:
+        pass
+
+
+def main():
+    """
+    Format or check YAML file formatting.
+    """
+    parser = argparse.ArgumentParser(
+        description="Format or check YAML file formatting."
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check YAML formatting without modifying files.",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Overwrite file with formatted output.",
+    )
+
+    args = parser.parse_args()
+    if args.all or args.check:
+        changed_files = find_all_yaml_files(ROOT_DIR)
+    else:
+        changed_files = get_changed_yaml_files()
+
+    if not changed_files:
+        logger.info("No YAML files to process.")
+        return
+
+    if args.check:
+        unformatted_files = []
+
+        for file in changed_files:
+            if not check_yaml_format(file):
+                unformatted_files.append([file])
+
+        if unformatted_files:
+            logger.info("YAML format check failed for the following files:")
+
+            success_emoji = "✅"
+            failure_emoji = "❌"
+
+            logger.info("Total files checked: %d", len(changed_files))
+            logger.info(
+                "Total files failed: %d %s", len(unformatted_files), failure_emoji
+            )
+            logger.info(
+                "Total files passed: %d %s",
+                len(changed_files) - len(unformatted_files),
+                success_emoji,
+            )
+            logger.info(
+                tabulate(
+                    unformatted_files,
+                    headers=["Unformatted YAML files"],
+                    tablefmt="simple",
+                )
+            )
+
+            sys.exit(1)
+        else:
+            logger.info("%d YAML files are correctly formatted 💥", len(changed_files))
+    else:
+        formatted_count = 0
+        for file in changed_files:
+            is_formated = check_yaml_format(file)
+            if not is_formated:
+                if format_yaml_file(file):
+                    formatted_count += 1
+        logger.info(f"Found {len(changed_files)} YAML files.")
+        logger.info(f"Formatted {formatted_count} YAML files.")
+
+
+if __name__ == "__main__":
+    main()

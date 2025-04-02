@@ -1,0 +1,301 @@
+#!/bin/bash
+set -euo pipefail # Exit on error, unset variables, and propagate pipe errors
+
+#############################
+# Global Variables & Setup
+#############################
+
+# Determine script and repository root directories
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+cd "$SCRIPT_DIR" || exit 1
+ROOT_PATH="$SCRIPT_DIR/../.."
+cd "$ROOT_PATH" || exit 1
+
+echo "🔍 Running format and lint checks..."
+
+FRONTEND_DIR="$ROOT_PATH/frontend"
+BACKEND_DIR="$ROOT_PATH/backend"
+
+# Get the list of staged files
+CHANGED_FILES=$(git diff --cached --name-only)
+
+# Determine which areas have changes
+BACKEND_CHANGED=$(echo "$CHANGED_FILES" | grep -E "^backend/" || true)
+FRONTEND_CHANGED=$(echo "$CHANGED_FILES" | grep -E "^frontend/" || true)
+
+# Global failure flag
+FAILED=0
+
+# Global array to track temporary files (ensure it's initialized)
+declare -a TMP_FILES=()
+
+#############################
+# Utility Functions
+#############################
+
+# Check if a required command is available
+check_command() {
+	if ! command -v "$1" >/dev/null 2>&1; then
+		echo "❌ Error: '$1' is required but not installed." >&2
+		exit 1
+	fi
+}
+
+# Register a temporary file for later cleanup
+register_tmp_file() {
+	TMP_FILES+=("$1")
+}
+
+# Cleanup temporary files on exit
+cleanup() {
+	# Use a default empty array if TMP_FILES is not set
+	if [[ ${#TMP_FILES[@]} -gt 0 ]]; then
+		for file in "${TMP_FILES[@]}"; do
+			[ -e "$file" ] && rm -f "$file"
+		done
+	fi
+}
+trap cleanup EXIT
+
+#############################
+# Formatting and Linting Functions
+#############################
+
+# Format Python files with Black and isort
+format_check_python_files() {
+	local files
+	files=$(echo "$1" | grep -E "\.py$" || true)
+	if [ -z "$files" ]; then
+		echo "✅ No Python files changed for formatting."
+		return
+	fi
+
+	check_command "black"
+	check_command "isort"
+
+	local black_tmp isort_tmp
+	black_tmp=$(mktemp /tmp/black_errors.XXXXXX)
+	register_tmp_file "$black_tmp"
+
+	isort_tmp=$(mktemp /tmp/isort_errors.XXXXXX)
+	register_tmp_file "$isort_tmp"
+
+	# Use null-separated file names to handle spaces
+	if ! echo "$files" | tr '\n' '\0' | xargs -0 black --check 2>"$black_tmp"; then
+		echo "--------------------------------------------"
+		echo "❌ Black check failed. Reformatting Python files..."
+		echo "$files" | tr '\n' '\0' | xargs -0 black
+		echo "$files" | tr '\n' '\0' | xargs -0 git add
+		echo "--------------------------------------------"
+		FAILED=1
+	else
+		echo "✅ Black check passed."
+	fi
+
+	if ! echo "$files" | tr '\n' '\0' | xargs -0 isort --profile black --src "$BACKEND_DIR" --check 2>"$isort_tmp"; then
+		echo "--------------------------------------------"
+		echo "❌ Isort check failed. Sorting imports..."
+		echo "$files" | tr '\n' '\0' | xargs -0 isort --profile black --src "$BACKEND_DIR"
+		echo "$files" | tr '\n' '\0' | xargs -0 git add
+		echo "--------------------------------------------"
+		FAILED=1
+	else
+		echo "✅ Isort check passed."
+	fi
+}
+
+# Lint Python files with mypy and pylint
+lint_check_python_files() {
+	local files
+	files=$(echo "$1" | grep -E "\.py$" || true)
+	if [ -z "$files" ]; then
+		echo "✅ No Python files changed for linting."
+		return
+	fi
+
+	check_command "mypy"
+	check_command "pylint"
+
+	local mypy_config="$BACKEND_DIR/mypy.ini"
+	local pylint_config="$BACKEND_DIR/.pylintrc"
+
+	for config in "$mypy_config" "$pylint_config"; do
+		if [ ! -f "$config" ]; then
+			echo "Error: Config file not found: $config"
+			exit 1
+		fi
+	done
+
+	local mypy_tmp pylint_tmp
+	mypy_tmp=$(mktemp /tmp/mypy_errors.XXXXXX)
+	register_tmp_file "$mypy_tmp"
+	pylint_tmp=$(mktemp /tmp/pylint_errors.XXXXXX)
+	register_tmp_file "$pylint_tmp"
+
+	# Run mypy
+	if ! MYPY_OUTPUT=$(mypy --config-file "$mypy_config" $files 2>&1); then
+		echo "--------------------------------------------"
+		echo "❌ Mypy check failed."
+		echo "$MYPY_OUTPUT"
+		echo "--------------------------------------------"
+		FAILED=1
+	else
+		echo "✅ Mypy check passed."
+	fi
+
+	# Run pylint
+	if ! PYLINT_OUTPUT=$(pylint --rcfile "$pylint_config" $files 2>&1); then
+		echo "--------------------------------------------"
+		echo "❌ Pylint check failed."
+		echo "$PYLINT_OUTPUT"
+		echo "--------------------------------------------"
+		FAILED=1
+	else
+		echo "✅ Pylint check passed."
+	fi
+}
+
+# Format Bash files with shfmt
+check_format_bash_files() {
+	check_command "shfmt"
+
+	local files
+	files=$(echo "$1" | grep -E "\.sh$" || true)
+	if [ -z "$files" ]; then
+		echo "✅ No Bash files changed for formatting."
+		return
+	fi
+
+	local shfmt_tmp
+	shfmt_tmp=$(mktemp /tmp/shfmt_errors.XXXXXX)
+	register_tmp_file "$shfmt_tmp"
+
+	echo "--------------------------------------------"
+	if ! echo "$files" | tr '\n' '\0' | xargs -0 shfmt -d; then
+		echo "❌ Shfmt check failed. Formatting Bash files..."
+		echo "$files" | tr '\n' '\0' | xargs -0 shfmt -w
+		echo "$files" | tr '\n' '\0' | xargs -0 git add
+		FAILED=1
+	else
+		echo "✅ Shfmt check passed."
+	fi
+	echo "--------------------------------------------"
+}
+
+# Format YAML files using a custom script
+check_format_yaml_files() {
+	local files
+	files=$(echo "$1" | grep -E "\.ya?ml$" || true)
+	if [ -z "$files" ]; then
+		echo "✅ No YAML files changed for formatting."
+		return
+	fi
+
+	# Assume the YAML formatting tool is in the backend dev tools directory
+	local yaml_dir="$ROOT_PATH/dev_tools/code_analysis/backend"
+	if [ ! -x "$yaml_dir/yaml_format" ]; then
+		echo "❌ Error: YAML formatter not found or not executable at $yaml_dir/yaml_format"
+		exit 1
+	fi
+
+	pushd "$yaml_dir" >/dev/null || exit 1
+	echo "--------------------------------------------"
+	if ! ./yaml_format --check; then
+		echo "❌ YAML format check failed. Fixing YAML formatting..."
+		./yaml_format --all
+		FAILED=1
+	else
+		echo "✅ YAML format check passed."
+	fi
+	popd >/dev/null || exit 1
+
+	echo "$files" | tr '\n' '\0' | xargs -0 git add
+	echo "--------------------------------------------"
+}
+
+# Format Dart files with dart format
+check_format_dart_files() {
+	check_command "dart"
+
+	local files
+	files=$(echo "$1" | grep -E "\.dart$" || true)
+	if [ -z "$files" ]; then
+		echo "✅ No Dart files changed for formatting."
+		return
+	fi
+	echo "--------------------------------------------"
+
+	FORMAT_OUTPUT=$(dart format --output=none $files 2>&1)||true
+
+	if echo "$FORMAT_OUTPUT" | grep -q "(0 changed)"; then
+		echo "✅ Dart format check passed."
+	else
+		echo "❌ Dart format check failed. Fixing Dart formatting..."
+		dart format $files
+		FAILED=1
+	fi
+	echo "$files" | tr '\n' '\0' | xargs -0 git add
+	echo "--------------------------------------------"
+}
+
+# Lint Dart files with dart analyze
+lint_check_dart_files() {
+	check_command "dart"
+
+	local files
+	files=$(echo "$1" | grep -E "\.dart$" || true)
+	if [ -z "$files" ]; then
+		echo "✅ No Dart files changed for linting."
+		return
+	fi
+
+	echo "--------------------------------------------"
+	ANALYZE_OUTPUT=$(dart analyze $files 2>&1) || true
+	LAST_LINE=$(echo "$ANALYZE_OUTPUT" | tail -n 1)
+
+	if echo "$LAST_LINE" | grep -q "No issues found!"; then
+		echo "✅ No issues found in Dart analysis."
+	else
+		echo "❌ Dart analysis issues found:"
+		echo "$ANALYZE_OUTPUT"
+		FAILED=1
+	fi
+	echo "--------------------------------------------"
+}
+
+#############################
+# Run Checks
+#############################
+
+# Backend checks (if any backend files are staged)
+if [ -n "$BACKEND_CHANGED" ]; then
+	echo -e "\033[1;34m➡️ Running checks for backend...\033[0m"
+	# Set the backend script directory for YAML checks
+	BACKEND_SCRIPT_DIR="$ROOT_PATH/dev_tools/code_analysis/backend"
+
+	format_check_python_files "$BACKEND_CHANGED"
+	lint_check_python_files "$BACKEND_CHANGED"
+	check_format_bash_files "$BACKEND_CHANGED"
+	check_format_yaml_files "$BACKEND_CHANGED"
+
+fi
+
+# Frontend checks (if any frontend files are staged)
+if [ -n "$FRONTEND_CHANGED" ]; then
+	echo -e "\033[1;34m➡️ Running checks for frontend...\033[0m"
+	check_format_dart_files "$FRONTEND_CHANGED"
+	lint_check_dart_files "$FRONTEND_CHANGED"
+fi
+
+#############################
+# Final Status
+#############################
+
+echo
+if [ "$FAILED" -ne 0 ]; then
+	echo "❌ Pre-commit checks failed. Please fix the issues before committing."
+	exit 1
+fi
+
+echo "✅ All checks passed! Proceeding with commit."
+exit 0

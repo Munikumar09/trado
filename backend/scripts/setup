@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+import logging
+import os
+import subprocess
+from pathlib import Path
+import argparse
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(Path(__file__).name)
+BACKEND_ROOT_PATH = Path(__file__).resolve().parents[1]
+
+
+def setup_env_vars():
+    # Ensure the script runs inside a conda environment
+    if "CONDA_PREFIX" not in os.environ:
+        logger.error("Not inside a conda environment. Exiting...")
+        return
+
+    # Set the paths for activation and deactivation scripts
+    env_dir = Path(os.environ["CONDA_PREFIX"])
+    activate_dir = env_dir / "etc" / "conda" / "activate.d"
+    deactivate_dir = env_dir / "etc" / "conda" / "deactivate.d"
+    activate_dir.mkdir(parents=True, exist_ok=True)
+    deactivate_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create activation script
+    with open(activate_dir / "project_env_vars.sh", "w") as f:
+        f.write("#!/bin/bash\n")
+        f.write(f"export ROOT_PATH={BACKEND_ROOT_PATH}\n")
+
+    # Create deactivation script
+    with open(deactivate_dir / "project_env_vars.sh", "w") as f:
+        f.write("#!/bin/bash\n")
+        f.write("unset ROOT_PATH\n")
+
+    # Create .env file if it doesn't exist or update it with ROOT_PATH
+    env_path = BACKEND_ROOT_PATH / ".env"
+    env_data = [f"ROOT_PATH={BACKEND_ROOT_PATH}\n"]
+    if env_path.exists():
+        with open(env_path, "r") as f:
+            prev_data = f.readlines()
+        for line in prev_data:
+            if not line.startswith("ROOT_PATH="):
+                env_data.append(line)
+
+    with open(env_path, "w") as f:
+        for env in env_data:
+            f.write(env)
+
+    logger.info(
+        "Environment variables set. Reactivate your conda environment to apply changes."
+    )
+
+
+def ensure_playwright_browsers_installed():
+    """
+    Ensure Playwright browsers (Chromium) are installed.
+    Assumes Playwright Python bindings are already installed.
+    """
+    # Install Chromium with dependencies
+    try:
+        # Check if playwright is installed
+        subprocess.run(
+            ["python", "-c", "import playwright"],
+            check=True,
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        logger.info("🔄 Installing Playwright Chromium dependencies...")
+        subprocess.run(["playwright", "install", "--with-deps", "chromium"], check=True)
+        logger.info("✅ Playwright Chromium installed successfully.")
+    except (subprocess.CalledProcessError, ImportError):
+        logger.error("Playwright Python bindings not found. Please install them first.")
+    except Exception as e:
+        logger.error(f"Error installing Playwright Chromium: {e}")
+
+
+def install_dependencies():
+    """Installs dependencies using Poetry."""
+    try:
+        logger.info("Installing dependencies with Poetry...")
+        os.chdir(BACKEND_ROOT_PATH)
+        subprocess.run(["poetry", "install"], check=True)
+        logger.info("Dependencies installed successfully.")
+    except subprocess.CalledProcessError:
+        logger.error("Error installing dependencies. Please check your Poetry setup.")
+
+
+def main(cli_args):
+    setup_env_vars()
+    install_dependencies()
+    
+    if not cli_args.cli:
+        ensure_playwright_browsers_installed()
+    else:
+        logger.info("Skipping Playwright installation.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Setup script for the project.")
+    parser.add_argument("--cli", action="store_true", help="Pass CLI argument")
+    args = parser.parse_args()
+    main(args)
