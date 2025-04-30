@@ -37,6 +37,9 @@ dependencies:
   dio: ^5.7.0
   flutter_secure_storage: ^9.2.4
   flutter_riverpod: ^2.5.1
+  provider: ^6.1.2 # Added for state management
+  web_socket_channel: ^2.4.5 # Added for WebSocket communication
+  intl: ^0.19.0 # Added for date formatting
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
   pretty_dio_logger: ^1.4.0

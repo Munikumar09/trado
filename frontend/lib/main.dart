@@ -16,16 +16,28 @@ Methods:
 
 // Code:
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+// Hide ChangeNotifierProvider from riverpod to avoid conflict with provider package
+import 'package:flutter_riverpod/flutter_riverpod.dart' hide ChangeNotifierProvider; 
+import 'package:provider/provider.dart'; // Import provider
 import 'package:frontend/core/constants/app_strings.dart';
+import 'package:frontend/core/network/websocket_service.dart'; // Import WebSocketService
 import 'package:frontend/core/routes/app_routes.dart';
 import 'package:frontend/core/themes/app_theme.dart';
 import 'package:frontend/features/auth/application/providers/global_providers.dart';
+import 'package:frontend/features/stock_ticker/application/stock_ticker_provider.dart'; // Import StockTickerProvider
 
 void main() {
+  // Instantiate the WebSocketService globally (or provide it differently if preferred)
+  final webSocketService = WebSocketService();
+
   runApp(
-    const ProviderScope(
-      child: TradingApp(),
+    // Keep Riverpod's ProviderScope for existing features
+    ProviderScope(
+      // Wrap with ChangeNotifierProvider for the new feature
+      child: ChangeNotifierProvider(
+        create: (_) => StockTickerProvider(webSocketService),
+        child: const TradingApp(),
+      ),
     ),
   );
 }

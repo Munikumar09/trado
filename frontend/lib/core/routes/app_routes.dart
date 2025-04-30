@@ -24,6 +24,7 @@ import 'package:frontend/features/auth/presentation/pages/register_page.dart';
 import 'package:frontend/features/auth/presentation/pages/verify_account.dart';
 import 'package:frontend/features/auth/presentation/pages/welcome_page.dart';
 import 'package:frontend/features/home/home.dart';
+import 'package:frontend/features/stock_ticker/presentation/stock_ticker_screen.dart'; // Import the new screen
 
 /// Provides a list of routes and their corresponding pages.
 class AppRoutes {
@@ -34,6 +35,8 @@ class AppRoutes {
   static const String verifyAccount = '/verify-account';
   static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
+  static const String stockTicker = '/stock-ticker'; // Add new route constant
+
   static final Map<String, WidgetBuilder> pages = {
     initial: (context) => InitialPage(),
     welcome: (context) => WelcomePage(),
@@ -42,5 +45,6 @@ class AppRoutes {
     forgotPassword: (context) => ForgotPasswordPage(),
     verifyAccount: (context) => VerifyAccountPage(),
     home: (context) => HomePage(),
+    stockTicker: (context) => const StockTickerScreen(), // Add route mapping
   };
 }

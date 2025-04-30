@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:frontend/core/routes/app_routes.dart'; // Import routes
 import 'package:frontend/features/auth/application/providers/global_providers.dart';
 
 final protectedDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
@@ -23,10 +24,24 @@ class HomePage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Home Page')),
       body: Center(
-        child: protectedData.when(
-          data: (data) => Text('Protected Data: ${data['message']}'),
-          loading: () => const CircularProgressIndicator(),
-          error: (error, _) => Text('Error: ${error.toString()}'),
+        child: Column( // Wrap in Column for multiple children
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Existing protected data display
+            protectedData.when(
+              data: (data) => Text('Protected Data: ${data['message']}'),
+              loading: () => const CircularProgressIndicator(),
+              error: (error, _) => Text('Error: ${error.toString()}'),
+            ),
+            const SizedBox(height: 30), // Add some spacing
+            // Button to navigate to Stock Ticker
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, AppRoutes.stockTicker);
+              },
+              child: const Text('Go to Live Stock Ticker'),
+            ),
+          ],
         ),
       ),
     );
