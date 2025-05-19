@@ -12,17 +12,17 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.utils.common.logger import get_logger
-from app.utils.fetch_data import get_required_env_var
+from app.utils.fetch_data import get_env_var
 
 logger = get_logger(Path(__file__).name)
 
 
 # Get the database connection details from the environment variables
-user_name: str = get_required_env_var("POSTGRES_USER")
-password: str = get_required_env_var("POSTGRES_PASSWORD")
-host: str = get_required_env_var("POSTGRES_HOST")
-port: str = get_required_env_var("POSTGRES_PORT")
-db_name: str = get_required_env_var("POSTGRES_DB")
+user_name: str = get_env_var("POSTGRES_USER")
+password: str = get_env_var("POSTGRES_PASSWORD")
+host: str = get_env_var("POSTGRES_HOST")
+port: str = get_env_var("POSTGRES_PORT")
+db_name: str = get_env_var("POSTGRES_DB")
 
 DATABASE_URL = f"postgresql://{quote_plus(user_name)}:{quote_plus(password)}@{host}:{port}/{db_name}"
 

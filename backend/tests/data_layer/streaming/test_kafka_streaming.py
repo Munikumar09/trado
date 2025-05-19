@@ -2,7 +2,7 @@
 import pytest
 from kafka.errors import KafkaError, NoBrokersAvailable
 
-from app.data_layer.streaming import KafkaStreamer
+from app.data_layer.streaming import KafkaProducer
 
 
 ####################### FIXTURES #######################
@@ -25,7 +25,7 @@ def kafka_streamer(mocker, kafka_server, kafka_topic):
         return_value=mock_kafka_producer,
     )
 
-    return KafkaStreamer(kafka_server, kafka_topic)
+    return KafkaProducer(kafka_server, kafka_topic)
 
 
 ####################### TESTS #######################
@@ -41,7 +41,7 @@ def test_kafka_streamer_init(mocker, kafka_server, kafka_topic):
     )
 
     # Initialize KafkaStreaming
-    kafka_streamer = KafkaStreamer(kafka_server, kafka_topic)
+    kafka_streamer = KafkaProducer(kafka_server, kafka_topic)
 
     assert kafka_streamer.kafka_topic == kafka_topic
     assert kafka_streamer.kafka_producer == mock_kafka_producer
@@ -57,7 +57,7 @@ def test_kafka_streamer_init_failure(mocker, kafka_server, kafka_topic):
 
     # Initialize KafkaStreaming and expect an exception
     with pytest.raises(NoBrokersAvailable):
-        KafkaStreamer(kafka_server, kafka_topic)
+        KafkaProducer(kafka_server, kafka_topic)
 
 
 # Test: 3 (Test the __call__ method of the KafkaStreaming class with successful data sending)
@@ -134,7 +134,7 @@ def test_kafka_streamer_from_cfg(mocker):
     cfg = {"kafka_server": "localhost:9092", "kafka_topic": "test-topic"}
 
     # Create KafkaStreaming from config
-    kafka_streamer = KafkaStreamer.from_cfg(cfg)
+    kafka_streamer = KafkaProducer.from_cfg(cfg)
 
     # Assertions
     assert kafka_streamer.kafka_topic == "test-topic"
@@ -158,7 +158,7 @@ def test_kafka_streamer_from_cfg_failure(mocker):
     cfg = {"kafka_server": "localhost:9092", "kafka_topic": "test-topic"}
 
     # Create KafkaStreaming from config
-    kafka_streamer = KafkaStreamer.from_cfg(cfg)
+    kafka_streamer = KafkaProducer.from_cfg(cfg)
 
     # Verify that None is returned and the error was logged
     assert kafka_streamer is None

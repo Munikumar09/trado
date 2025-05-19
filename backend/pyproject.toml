@@ -25,7 +25,8 @@ numpy = "^1.26.4"
 pandas = "^2.2.2"
 sqlmodel = "^0.0.19"
 registrable = "^0.0.4"
-kafka-python-ng = "^2.2.2"
+aiokafka = "^0.10.0" # Added for async Kafka consumption
+redis = {extras = ["hiredis"], version = "^5.0.1"} # Added for caching
 pytest-mock = "^3.14.0"
 autobahn = "^24.4.2"
 twisted = "^24.7.0"

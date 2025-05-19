@@ -5,7 +5,7 @@ required to authenticate the SmartAPI connection.
 """
 
 from app.utils.credentials.credentials import Credentials
-from app.utils.fetch_data import get_required_env_var
+from app.utils.fetch_data import get_env_var
 
 
 @Credentials.register("smartapi")
@@ -44,9 +44,9 @@ class SmartapiCredentials(Credentials):
         ``SmartapiCredentials``
             The credentials object with the API key, client id, password, token and correlation id
         """
-        api_key = get_required_env_var("SMARTAPI_API_KEY")
-        client_id = get_required_env_var("SMARTAPI_CLIENT_ID")
-        pwd = get_required_env_var("SMARTAPI_PWD")
-        token = get_required_env_var("SMARTAPI_TOKEN")
+        api_key = get_env_var("SMARTAPI_API_KEY")
+        client_id = get_env_var("SMARTAPI_CLIENT_ID")
+        pwd = get_env_var("SMARTAPI_PWD")
+        token = get_env_var("SMARTAPI_TOKEN")
 
         return SmartapiCredentials(api_key, client_id, pwd, token)

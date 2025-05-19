@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 
 from app.data_layer.database.crud.crud_utils import get_data_by_all_conditions
 from app.data_layer.database.models import Instrument
-from app.data_layer.streaming.streamer import Streamer
+from app.data_layer.streaming.producer import Producer
 from app.sockets.connections.websocket_connection import WebsocketConnection
 from app.sockets.twisted_sockets import SmartSocket
 from app.utils.common import init_from_cfg
@@ -127,7 +127,7 @@ class SmartSocketConnection(WebsocketConnection):
             cfg.provider.correlation_id = correlation_id
 
             # Initialize callback function for streaming data
-            save_data_callback = init_from_cfg(cfg.streaming, Streamer)
+            save_data_callback = init_from_cfg(cfg.streaming, Producer)
 
             # Initialize SmartSocket only after confirming tokens exist
             smart_socket = SmartSocket.initialize_socket(

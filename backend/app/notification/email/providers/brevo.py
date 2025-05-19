@@ -12,7 +12,7 @@ from omegaconf import DictConfig
 from app.notification.email.email_provider import EmailProvider
 from app.notification.provider import NotificationProvider
 from app.utils.common.logger import get_logger
-from app.utils.fetch_data import get_required_env_var
+from app.utils.fetch_data import get_env_var
 
 logger = get_logger(Path(__file__).name)
 
@@ -35,9 +35,9 @@ class BrevoEmailProvider(EmailProvider):
     def __init__(self, sender_name: str, sender_email: str, brevo_api_key_name) -> None:
 
         self.configuration = brevo_python.Configuration()
-        self.configuration.api_key["api-key"] = get_required_env_var(brevo_api_key_name)
-        self.sender_name = get_required_env_var(sender_name)
-        self.sender_email = get_required_env_var(sender_email)
+        self.configuration.api_key["api-key"] = get_env_var(brevo_api_key_name)
+        self.sender_name = get_env_var(sender_name)
+        self.sender_email = get_env_var(sender_email)
 
     def send_notification(
         self, code: str, recipient_email: str, recipient_name: str

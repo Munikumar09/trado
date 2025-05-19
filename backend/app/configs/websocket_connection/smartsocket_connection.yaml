@@ -7,7 +7,7 @@ provider:
   name: smartsocket
   correlation_id: smart0000_
   subscription_mode: snap_quote
-  debug: false
+  debug: true
   ping_interval: 25
   ping_message: ping
 streaming: ${kafka}

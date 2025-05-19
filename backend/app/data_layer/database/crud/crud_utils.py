@@ -259,13 +259,19 @@ def _upsert(
     elif db_type == "postgresql":
         # PostgreSQL supports `ON CONFLICT DO UPDATE`
         upsert_stmt = postgres_insert(table).values(upsert_data)
+
+        # Correctly identify primary key column names
+        primary_key_column_names = {key.name for key in table.primary_key.columns}
+
         columns = {
             column.name: getattr(upsert_stmt.excluded, column.name)
             for column in table.columns
-            if column.name not in table.primary_key  # Exclude primary key columns
+            if column.name not in primary_key_column_names  # Use the set of names
         }
         upsert_stmt = upsert_stmt.on_conflict_do_update(
-            index_elements=[key.name for key in table.primary_key],
+            index_elements=[
+                key.name for key in table.primary_key.columns
+            ],  # Use columns attribute
             set_=columns,
         )
         session.exec(upsert_stmt)  # type: ignore
@@ -362,10 +368,20 @@ def insert_data(
         data = [data]
 
     # Convert list of SQLModel to a list of dicts
+    # Ensure None values are handled correctly if model_dump excludes them by default
     data_to_insert = cast(
         list[dict[str, Any]],
-        [item.model_dump() if isinstance(item, SQLModel) else item for item in data],
+        [
+            item.model_dump(exclude_none=False) if isinstance(item, SQLModel) else item
+            for item in data
+        ],
     )
+
+    if not data_to_insert:
+        logger.warning(
+            "Data list became empty after conversion/filtering. Skipping insertion."
+        )
+        return False
 
     if update_existing:
         _upsert(model, data_to_insert, session=session)

@@ -11,14 +11,14 @@ from redis import Redis
 from app.utils.common.logger import get_logger
 from app.utils.constants import UPLINK_ACCESS_TOKEN
 from app.utils.credentials.credentials import Credentials
-from app.utils.fetch_data import get_required_env_var
-from app.utils.redis_utils import init_redis_client
+from app.utils.fetch_data import get_env_var
+from app.utils.redis_utils import RedisSyncConnection
 from app.utils.urls import REDIRECT_URI, UPLINK_ACCESS_TOKEN_URL, UPLINK_AUTH_URL
 
 logger = get_logger(Path(__file__).name)
 
 
-def set_key_with_expiry(key: str, value: str) -> None:
+def set_key_with_expiry(key: str, value: str, client: Redis) -> None:
     """
     Store a key-value pair in Redis with an expiry time set to 3:30 PM of the current or next day
 
@@ -28,8 +28,9 @@ def set_key_with_expiry(key: str, value: str) -> None:
         The key to store in Redis
     value: ``str``
         The value to associate with the key
+    client: ``Redis``
+        The Redis client to use for storing the key-value pair
     """
-    client = init_redis_client(False)
     now = datetime.now()
     expiry_time = now.replace(
         hour=15, minute=30, second=0, microsecond=0
@@ -46,7 +47,7 @@ def set_key_with_expiry(key: str, value: str) -> None:
     client.expireat(key, expiry_timestamp)
 
 
-def get_and_validate_key(key: str) -> str | None:
+def get_and_validate_key(key: str, client: Redis) -> str | None:
     """
     Retrieve and validate a key from Redis
 
@@ -54,13 +55,14 @@ def get_and_validate_key(key: str) -> str | None:
     ----------
     key: ``str``
         The key to retrieve from Redis
+    client: ``Redis``
+        The Redis client to use for retrieving the key
 
     Returns
     -------
     value: ``str | None``
         The value associated with the key if it exists and is valid, otherwise None
     """
-    client = cast(Redis, init_redis_client(False))
     value = cast(str | None, client.get(key))
 
     if value is None:
@@ -230,18 +232,20 @@ class UplinkCredentials(Credentials):
         ``UplinkCredentials``
             The credentials object with the access token
         """
-        access_token = get_and_validate_key(UPLINK_ACCESS_TOKEN)
+        connection = RedisSyncConnection()
+        client = connection.get_connection()
+        access_token = get_and_validate_key(UPLINK_ACCESS_TOKEN, client)
 
         if access_token:
             logger.info("Using cached Uplink access token.")
             return UplinkCredentials(access_token)
 
         logger.info("Generating new Uplink access token.")
-        api_key = get_required_env_var("UPLINK_API_KEY")
-        secret_key = get_required_env_var("UPLINK_SECRET_KEY")
-        totp_key = get_required_env_var("UPLINK_TOTP_KEY")
-        mobile_no = get_required_env_var("UPLINK_MOBILE_NO")
-        pin = get_required_env_var("UPLINK_PIN")
+        api_key = get_env_var("UPLINK_API_KEY")
+        secret_key = get_env_var("UPLINK_SECRET_KEY")
+        totp_key = get_env_var("UPLINK_TOTP_KEY")
+        mobile_no = get_env_var("UPLINK_MOBILE_NO")
+        pin = get_env_var("UPLINK_PIN")
 
         # Automate the login process using Playwright
         with sync_playwright() as playwright:
@@ -260,6 +264,6 @@ class UplinkCredentials(Credentials):
             access_token = _get_access_token(
                 auth_code, api_key, secret_key, REDIRECT_URI
             )
-            set_key_with_expiry(UPLINK_ACCESS_TOKEN, access_token)
+            set_key_with_expiry(UPLINK_ACCESS_TOKEN, access_token, client)
 
         return UplinkCredentials(access_token)

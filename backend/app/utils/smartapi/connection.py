@@ -4,23 +4,10 @@ from http.client import HTTPConnection
 import pyotp
 from SmartApi import SmartConnect
 
+from app.core.singleton import Singleton
 from app.utils.common.types.reques_types import RequestType
 from app.utils.credentials.credentails_manager import DataProvider, get_credentials
 from app.utils.credentials.credentials import Credentials
-
-
-class Singleton(type):
-    """
-    Singleton class to create a single instance of the SmartApiConnection class.
-    """
-
-    _instances: dict = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
-
-        return cls._instances[cls]
 
 
 class SmartApiConnection(metaclass=Singleton):

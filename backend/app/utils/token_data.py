@@ -32,7 +32,12 @@ def get_smartapi_token_data() -> list[Instrument]:
         df["instrumenttype"] = df["symbol"].apply(lambda x: x.split("-")[-1])
         df = df[df["instrumenttype"].isin(["EQ", "SM", "BE", "ST"])]
         df["symbol"] = df["symbol"].apply(lambda x: x.split("-")[0])
-
+        df["exchange_id"] = ExchangeType.NSE.value
+        df["data_provider_id"] = DataProviderType.SMARTAPI.value
+        df.drop_duplicates(
+            subset=["symbol", "exchange_id", "data_provider_id"], inplace=True
+        )
+        df.reset_index(drop=True, inplace=True)
         return [
             Instrument(
                 token=token["token"],
@@ -71,6 +76,12 @@ def get_uplink_token_data() -> list[Instrument]:
         df = df[df["segment"] == "BSE_EQ"]
         df = df[df["instrument_type"].isin(["A", "B", "X", "T", "XT", "M", "MT"])]
         df["instrument_type"] = df["segment"].apply(lambda x: x.split("_")[1])
+        df["exchange_id"] = ExchangeType.BSE.value
+        df["data_provider_id"] = DataProviderType.UPLINK.value
+        df.drop_duplicates(
+            subset=["trading_symbol", "exchange_id", "data_provider_id"], inplace=True
+        )
+        df.reset_index(drop=True, inplace=True)
 
         return [
             Instrument(
