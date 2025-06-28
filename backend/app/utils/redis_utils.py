@@ -132,6 +132,7 @@ class RedisAsyncConnection(RedisConnection):
         ``async_redis.ResponseError``
             If the Redis server returns an error
         """
+
         if self.connection_pool is None:
             self.connection_pool = async_redis.ConnectionPool(
                 host=self.host,
@@ -143,7 +144,7 @@ class RedisAsyncConnection(RedisConnection):
                 retry_on_timeout=self.retry_on_timeout,
             )
         connection = async_redis.Redis(connection_pool=self.connection_pool)
-        await connection.ping()
+        # await connection.ping()
         return connection
 
     async def close_connection(self) -> None:

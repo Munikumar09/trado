@@ -4,6 +4,7 @@ Most of the functions are generic and can be used for any table in the database.
 functions are used to perform Insert, Update, Delete and Select operations on the tables.
 """
 
+import typing
 from pathlib import Path
 from typing import Any, Sequence, cast
 
@@ -55,11 +56,32 @@ def validate_model_attributes(model: type[SQLModel], attributes: dict[str, Any])
             )
 
         # Check if the attribute type matches the model attribute type
-        if not model.__annotations__[key] is type(attributes[key]):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                f"Attribute {key} is not of type {model.__annotations__[key]} in {model_name} model",
-            )
+        expected_type = model.__annotations__[key]
+        actual_value = attributes[key]
+
+        # Handle Union types (like str | None)
+        if (
+            hasattr(typing, "get_origin")
+            and typing.get_origin(expected_type) is typing.Union
+        ):
+            # For Union types, check if the actual type is one of the allowed types
+            allowed_types = typing.get_args(expected_type)
+            if not any(
+                isinstance(actual_value, allowed_type)
+                or (actual_value is None and type(None) in allowed_types)
+                for allowed_type in allowed_types
+            ):
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"Attribute {key} is not of type {expected_type} in {model_name} model",
+                )
+        else:
+            # For non-Union types, use direct type checking
+            if not isinstance(actual_value, expected_type):
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST,
+                    f"Attribute {key} is not of type {expected_type} in {model_name} model",
+                )
 
 
 def get_conditions_list(

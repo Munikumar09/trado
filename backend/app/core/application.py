@@ -84,14 +84,18 @@ class FastAPIApp(metaclass=Singleton):
                 version=API_VERSION,
             )
 
-        # Add CORS middleware
-        cls._app.add_middleware(
-            CORSMiddleware,
-            allow_origins=get_env_var("CORS_ORIGINS", "*").split(","),
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+            # Add CORS middleware - only once when app is created
+            cors_origins = get_env_var("CORS_ORIGINS", "*")
+            if cors_origins is None:
+                cors_origins = "*"
+
+            cls._app.add_middleware(
+                CORSMiddleware,
+                allow_origins=cors_origins.split(","),
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
         return cls._app
 
 
@@ -237,25 +241,34 @@ async def shutdown_event():
                     )
                 except asyncio.TimeoutError:
                     logger.warning("Timed out waiting for WebSocket server to stop")
-            AppState.websocket_server_port = None
-            AppState.websocket_server_running = False
             logger.info("WebSocket server stopped")
         except Exception as e:
             logger.error("Error stopping WebSocket server: %s", e, exc_info=True)
+        finally:
+            AppState.websocket_server_port = None
+            AppState.websocket_server_running = False
 
     # Stop Kafka Consumer
     if AppState.kafka_consumer_task and not AppState.kafka_consumer_task.done():
         logger.info("Stopping Kafka consumer...")
-        AppState.kafka_consumer_task.cancel()
         try:
+            # First, try to wait for graceful completion
             await asyncio.wait_for(AppState.kafka_consumer_task, timeout=5.0)
             logger.info("Kafka consumer stopped")
-        except asyncio.CancelledError:
-            logger.info("Kafka consumer task cancelled")
         except asyncio.TimeoutError:
             logger.warning("Timed out waiting for Kafka consumer to stop")
+
+            # Cancel the task if it didn't stop gracefully
+            AppState.kafka_consumer_task.cancel()
+            try:
+                await AppState.kafka_consumer_task
+            except asyncio.CancelledError:
+                logger.info("Kafka consumer task cancelled")
+        except asyncio.CancelledError:
+            logger.info("Kafka consumer task cancelled")
         except Exception as e:
             logger.error("Error during Kafka task shutdown: %s", e, exc_info=True)
-        AppState.kafka_consumer_task = None
+        finally:
+            AppState.kafka_consumer_task = None
 
     logger.info("%s shutdown complete", SERVICE_NAME)

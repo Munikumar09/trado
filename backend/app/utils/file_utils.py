@@ -156,4 +156,42 @@ def read_csv(file_path: str | Path) -> list:
     with open(file_path, "r", encoding="utf-8") as fp:
         reader = csv.reader(fp)
 
-    return list(reader)
+        return list(reader)
+
+
+def read_jsonl(file_path: str | Path) -> list:
+    """
+    Read the data from the given jsonl file path.
+
+    Parameters
+    ----------
+    file_path: ``str | Path``
+        Path to the jsonl path
+
+    Return
+    ------
+    ``list``
+        Loaded data from the given jsonl file path
+    """
+    json_data = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            json_data.append(json.loads(line))
+
+    return json_data
+
+
+def write_jsonl(file_path: str | Path, data: list, ensure_ascii: bool = False):
+    """
+    Write the data into the given jsonl file path.
+
+    Parameters
+    ----------
+    file_path: ``str | Path``
+        Destination file path to write data
+    data: ``list``
+        Data to be written into the file
+    """
+    with open(file_path, "w", encoding="utf-8") as f:
+        for item in data:
+            f.write(json.dumps(item, ensure_ascii=ensure_ascii) + "\n")

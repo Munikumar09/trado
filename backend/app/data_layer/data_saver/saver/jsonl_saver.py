@@ -1,13 +1,16 @@
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from kafka import KafkaConsumer
-from kafka.errors import NoBrokersAvailable
+from confluent_kafka import Consumer
+from confluent_kafka.error import KafkaException
 from omegaconf import DictConfig
 
 from app.data_layer.data_saver.data_saver import DataSaver
 from app.utils.common.logger import get_logger
+from app.utils.constants import KAFKA_CONSUMER_DEFAULT_CONFIG, KAFKA_CONSUMER_GROUP_ID
+from app.utils.kafka_utils import get_kafka_consumer
 
 logger = get_logger(Path(__file__).name)
 
@@ -29,7 +32,7 @@ class JSONLDataSaver(DataSaver):
         be `data_2021_09_01.jsonl`
     """
 
-    def __init__(self, consumer: KafkaConsumer, jsonl_file_path: str | Path) -> None:
+    def __init__(self, consumer: Consumer, jsonl_file_path: str | Path) -> None:
         self.consumer = consumer
 
         if isinstance(jsonl_file_path, str):
@@ -47,16 +50,26 @@ class JSONLDataSaver(DataSaver):
         """
         Retrieve the data from the kafka consumer and save it to the jsonl file.
         """
-        idx = 0
         try:
-            with open(self.jsonl_file_path, "a", encoding="utf-8", newline="") as file:
-                for idx, message in enumerate(self.consumer):
-                    decoded_data = message.value.decode("utf-8")
-                    file.write(decoded_data + "\n")
+            idx = 0
+            with open(self.jsonl_file_path, "a+", encoding="utf-8", newline="") as file:
+                while True:
+                    data = self.consumer.poll(timeout=1.0)
+                    if not data:
+                        continue
+
+                    if data.error():
+                        raise KafkaException(data.error())
+
+                    message = data.value().decode("utf-8")
+                    decoded_data = json.loads(message)
+                    file.write(json.dumps(decoded_data, ensure_ascii=False) + "\n")
                     file.flush()
+                    idx += 1
         except Exception as e:
             logger.error("Error while saving data to jsonl: %s", e)
         finally:
+            self.consumer.close()
             logger.info("%s messages saved to jsonl", idx)
 
     @classmethod
@@ -64,18 +77,25 @@ class JSONLDataSaver(DataSaver):
         """
         Create an instance of the JSONLDataSaver class from the given configuration.
         """
-        try:
-            return cls(
-                KafkaConsumer(
-                    cfg.streaming.kafka_topic,
-                    bootstrap_servers=cfg.streaming.kafka_server,
-                    auto_offset_reset="earliest",
-                ),
-                cfg.get("jsonl_file_path"),
-            )
-        except NoBrokersAvailable:
+        consumer = get_kafka_consumer(
+            {
+                "bootstrap.servers": cfg.streaming.kafka_server,
+                "group.id": KAFKA_CONSUMER_GROUP_ID,
+                **KAFKA_CONSUMER_DEFAULT_CONFIG,
+            },
+            cfg.streaming.kafka_topic,
+        )
+
+        if not consumer:
+            return None
+
+        if not cfg.get("jsonl_file_path"):
             logger.error(
-                "No Broker is available at the address: %s. No data will be saved.",
-                cfg.streaming.kafka_server,
+                "No jsonl_file_path provided in the configuration. No data will be saved."
             )
             return None
+
+        return cls(
+            consumer,
+            cfg.get("jsonl_file_path"),
+        )

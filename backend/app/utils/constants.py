@@ -42,3 +42,12 @@ KAFKA_CONSUMER_GROUP_ID = "KAFKA_CONSUMER_GROUP_ID"
 
 # Websocket Server
 CHANNEL_PREFIX = "stock:"
+
+KAFKA_CONSUMER_DEFAULT_CONFIG = {
+    "auto.offset.reset": "earliest",
+    "enable.auto.commit": True,
+    "broker.address.family": "v4",
+    "session.timeout.ms": 30000,  # 30 seconds
+    "fetch.min.bytes": 1,
+    "fetch.wait.max.ms": 500,
+}

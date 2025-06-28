@@ -47,3 +47,13 @@ class Singleton(type):
                 cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
 
             return cls._instances[cls]
+
+    @classmethod
+    def clear_instance(mcs, target_cls: Type) -> None:
+        """
+        Clear the singleton instance for the given class.
+        Useful for testing purposes.
+        """
+        with mcs._lock:
+            if target_cls in mcs._instances:
+                del mcs._instances[target_cls]

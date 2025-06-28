@@ -63,6 +63,11 @@ def smart_socket_mock(mocker: MockerFixture) -> Any:
     return mocker.patch("app.sockets.connections.uplinksocket_connection.UplinkSocket")
 
 
+@pytest.fixture(autouse=True)
+def mock_producer(mocker: MockerFixture):
+    return mocker.patch("app.sockets.connections.uplinksocket_connection.init_from_cfg")
+
+
 @pytest.fixture
 def connection(
     connection_cfg: Dict[str, Any],
@@ -88,6 +93,7 @@ def expected_tokens(websocket_instrument_data: list[dict[str, Any]]) -> Dict[int
 def test_init_from_cfg_valid_cfg(
     connection_cfg: Dict[str, Any],
     smart_socket_mock: Any,
+    mock_producer: Any,
     expected_tokens: Dict[int, str],
 ) -> None:
     """
@@ -99,7 +105,9 @@ def test_init_from_cfg_valid_cfg(
 
     assert connection is not None
     assert isinstance(connection, UplinkSocketConnection)
-    smart_socket_mock.initialize_socket.assert_called_once_with(cfg.provider, None)
+    smart_socket_mock.initialize_socket.assert_called_once_with(
+        cfg.provider, mock_producer.return_value
+    )
     assert smart_socket_mock.mock_calls[1] == call.initialize_socket().set_tokens(
         expected_tokens
     )

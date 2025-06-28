@@ -73,7 +73,7 @@ def sample_instrument_price(sample_instrument_price_data) -> InstrumentPrice:
     )
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def create_insert_sample_data(session, sample_instrument, sample_instrument_price):
     """
     Insert sample data into the database

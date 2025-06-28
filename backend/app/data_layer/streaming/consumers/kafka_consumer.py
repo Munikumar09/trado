@@ -157,6 +157,30 @@ class KafkaConsumer(Consumer):
 
         return msg.value().decode("utf-8")
 
+    def _transform_message(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Transform the raw payload into the required message format.
+        """
+        return {
+            "retrieval_timestamp": payload["retrieval_timestamp"],
+            "last_traded_timestamp": payload["last_traded_timestamp"],
+            "symbol": payload["symbol"],
+            "exchange": cast(
+                ExchangeType,
+                ExchangeType.get_exchange(payload["exchange_id"]),
+            ).name,
+            "data_provider": cast(
+                DataProviderType,
+                DataProviderType.get_data_provider(payload["data_provider_id"]),
+            ).name,
+            "last_traded_price": payload["last_traded_price"],
+            "last_traded_quantity": payload.get("last_traded_quantity"),
+            "average_traded_price": payload.get("average_traded_price"),
+            "volume_trade_for_the_day": payload.get("volume_trade_for_the_day"),
+            "total_buy_quantity": payload.get("total_buy_quantity"),
+            "total_sell_quantity": payload.get("total_sell_quantity"),
+        }
+
     async def process_message(self, data: dict[str, Any], redis_client: Redis) -> None:
         """
         Process a market data message from Kafka and publish to Redis.
@@ -200,6 +224,50 @@ class KafkaConsumer(Consumer):
             logger.exception("Failed to process message: %s, error: %s", data, str(e))
             raise
 
+    def _handle_consume_error(self, error: Exception, raw: str | None) -> None:
+        """
+        Handle errors during message consumption and log appropriately.
+        """
+        if isinstance(error, json.JSONDecodeError):
+            logger.error(
+                "JSON decode error: %s | Raw message: %s...",
+                error,
+                raw[:100] if raw else "None",
+            )
+        elif isinstance(error, KafkaException):
+            logger.error("Kafka error: %s", error)
+        else:
+            logger.exception("Unexpected error processing message: %s", error)
+
+    async def _apply_backoff(self, consecutive_errors: int) -> None:
+        """
+        Apply exponential backoff with jitter based on consecutive errors.
+        """
+        backoff_time = min(
+            MIN_BACKOFF_TIME * (2 ** (consecutive_errors - 1)) + random.uniform(0, 1),
+            MAX_BACKOFF_TIME,
+        )
+
+        if consecutive_errors >= MAX_BACKOFF_ATTEMPTS:
+            logger.critical(
+                "Reached maximum retry attempts (%d). Backing off for %.2f seconds.",
+                MAX_BACKOFF_ATTEMPTS,
+                backoff_time,
+            )
+        elif consecutive_errors > 3:
+            logger.warning(
+                "Multiple errors (%d). Backing off for %.2f seconds.",
+                consecutive_errors,
+                backoff_time,
+            )
+        else:
+            logger.info(
+                "Error encountered. Backing off for %.2f seconds.",
+                backoff_time,
+            )
+
+        await asyncio.sleep(backoff_time)
+
     async def consume_messages(self) -> None:
         """
         Continuously consume and process messages from Kafka.
@@ -227,6 +295,7 @@ class KafkaConsumer(Consumer):
 
         consecutive_errors = 0
         last_success_time = time.time()
+        print("Kafka consumer started")
 
         try:
             loop = asyncio.get_running_loop()
@@ -282,74 +351,6 @@ class KafkaConsumer(Consumer):
             self._executor.shutdown(wait=True)
             logger.info("Kafka consumer resources cleaned up")
 
-    def _transform_message(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """
-        Transform the raw payload into the required message format.
-        """
-        return {
-            "retrieval_timestamp": payload["retrieval_timestamp"],
-            "last_traded_timestamp": payload["last_traded_timestamp"],
-            "symbol": payload["symbol"],
-            "exchange": cast(
-                ExchangeType,
-                ExchangeType.get_exchange(payload["exchange_id"]),
-            ).name,
-            "data_provider": cast(
-                DataProviderType,
-                DataProviderType.get_data_provider(payload["data_provider_id"]),
-            ).name,
-            "last_traded_price": payload["last_traded_price"],
-            "last_traded_quantity": payload.get("last_traded_quantity"),
-            "average_traded_price": payload.get("average_traded_price"),
-            "volume_trade_for_the_day": payload.get("volume_trade_for_the_day"),
-            "total_buy_quantity": payload.get("total_buy_quantity"),
-            "total_sell_quantity": payload.get("total_sell_quantity"),
-        }
-
-    def _handle_consume_error(self, error: Exception, raw: str | None) -> None:
-        """
-        Handle errors during message consumption and log appropriately.
-        """
-        if isinstance(error, json.JSONDecodeError):
-            logger.error(
-                "JSON decode error: %s | Raw message: %s...",
-                error,
-                raw[:100] if raw else "None",
-            )
-        elif isinstance(error, KafkaException):
-            logger.error("Kafka error: %s", error)
-        else:
-            logger.exception("Unexpected error processing message: %s", error)
-
-    async def _apply_backoff(self, consecutive_errors: int) -> None:
-        """
-        Apply exponential backoff with jitter based on consecutive errors.
-        """
-        backoff_time = min(
-            MIN_BACKOFF_TIME * (2 ** (consecutive_errors - 1)) + random.uniform(0, 1),
-            MAX_BACKOFF_TIME,
-        )
-
-        if consecutive_errors >= MAX_BACKOFF_ATTEMPTS:
-            logger.critical(
-                "Reached maximum retry attempts (%d). Backing off for %.2f seconds.",
-                MAX_BACKOFF_ATTEMPTS,
-                backoff_time,
-            )
-        elif consecutive_errors > 3:
-            logger.warning(
-                "Multiple errors (%d). Backing off for %.2f seconds.",
-                consecutive_errors,
-                backoff_time,
-            )
-        else:
-            logger.info(
-                "Error encountered. Backing off for %.2f seconds.",
-                backoff_time,
-            )
-
-        await asyncio.sleep(backoff_time)
-
     def stop(self):
         """
         Signal the consumer to gracefully stop processing messages.
@@ -387,7 +388,7 @@ class KafkaConsumer(Consumer):
             config_dict = {}
 
             if "consumer_config" in cfg:
-                consumer_config = cfg.get("consumer_config", {})
+                consumer_config = cfg.consumer_config
                 if hasattr(consumer_config, "to_dict"):
                     config_dict = consumer_config.to_dict()
                 else:

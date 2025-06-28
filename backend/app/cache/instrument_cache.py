@@ -291,7 +291,8 @@ async def get_stock_data(stock_name: str) -> dict[str, Any] | None:
         return None
 
     try:
-        r = await RedisAsyncConnection().get_connection()
+        connection = RedisAsyncConnection()
+        r = await connection.get_connection()
         cache_key = f"{CHANNEL_PREFIX}{stock_name}"
         data_str = await r.get(cache_key)
 

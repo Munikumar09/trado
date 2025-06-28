@@ -70,7 +70,7 @@ class MockNotificationProvider:
         }
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_notification_provider(mocker: MockFixture):
     """
     Mock the notification provider.
@@ -141,7 +141,7 @@ def validate_http_exception(
 
 
 def validate_verification_code_sent(
-    response: Response, email: str, mock_notification_provider: MockNotificationProvider
+    response: Response, email: str, notification_provider: MockNotificationProvider
 ):
     """
     Validate the verification code sent with the following assertions:
@@ -151,9 +151,9 @@ def validate_verification_code_sent(
     - The recipient email is the same as the email passed
     """
     assert response.status_code == 200
-    assert mock_notification_provider.code is not None
-    assert len(mock_notification_provider.code) == 6
-    assert mock_notification_provider.recipient_email == email
+    assert notification_provider.code is not None
+    assert len(notification_provider.code) == 6
+    assert notification_provider.recipient_email == email
 
 
 def validate_user_verification(

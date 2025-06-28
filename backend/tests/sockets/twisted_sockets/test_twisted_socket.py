@@ -57,7 +57,7 @@ def mock_threading(mocker: MockerFixture):
     return mocker.patch("app.sockets.twisted_socket.threading")
 
 
-class TestWebSocket(MarketDataTwistedSocket):
+class SampleWebSocket(MarketDataTwistedSocket):
     """
     Test class for the MarketDataTwistedSocket class.
     """
@@ -86,18 +86,18 @@ class TestWebSocket(MarketDataTwistedSocket):
 
 
 @pytest.fixture
-def websocket_instance() -> TestWebSocket:
+def websocket_instance() -> SampleWebSocket:
     """
     Fixture to provide a TestWebSocket instance.
     """
-    return TestWebSocket()
+    return SampleWebSocket()
 
 
 ############################ TESTS ############################
 
 
 # Test: 1
-def test_initialization(websocket_instance: TestWebSocket):
+def test_initialization(websocket_instance: SampleWebSocket):
     """
     Test the initialization values of the WebSocket instance.
     """
@@ -114,7 +114,7 @@ def test_initialization(websocket_instance: TestWebSocket):
 
 # Test: 2
 def test_create_connection(
-    mock_websocket_factory: MockType, websocket_instance: TestWebSocket
+    mock_websocket_factory: MockType, websocket_instance: SampleWebSocket
 ):
     """
     Test the creation of the WebSocket connection and ensure factory setup is correct.
@@ -140,7 +140,7 @@ def test_create_connection(
 # Test: 3
 def test_connect(
     mock_connect_ws: MockType,
-    websocket_instance: TestWebSocket,
+    websocket_instance: SampleWebSocket,
     mock_reactor: MockType,
     mock_threading: MockType,
 ):
@@ -173,7 +173,7 @@ def test_connect(
 
 
 # Test: 4
-def test_is_connected(websocket_instance: TestWebSocket):
+def test_is_connected(websocket_instance: SampleWebSocket):
     """
     Test the is_connected method to check WebSocket connection status.
     """
@@ -191,7 +191,7 @@ def test_is_connected(websocket_instance: TestWebSocket):
 
 
 # Test: 5
-def test_close(websocket_instance: TestWebSocket):
+def test_close(websocket_instance: SampleWebSocket):
     """
     Test the close method to ensure the WebSocket is properly closed.
     """
@@ -202,7 +202,7 @@ def test_close(websocket_instance: TestWebSocket):
 
 
 # Test: 6
-def test_on_connect(websocket_instance: TestWebSocket):
+def test_on_connect(websocket_instance: SampleWebSocket):
     """
     Test the _on_connect method to ensure the on_connect callback is executed.
     """
@@ -215,7 +215,7 @@ def test_on_connect(websocket_instance: TestWebSocket):
 
 
 # Test: 7
-def test_on_close(websocket_instance: TestWebSocket):
+def test_on_close(websocket_instance: SampleWebSocket):
     """
     Test the _on_close method to ensure the on_close callback is executed.
     """
@@ -227,7 +227,7 @@ def test_on_close(websocket_instance: TestWebSocket):
 
 
 # Test: 8
-def test_on_reconnect(websocket_instance: TestWebSocket):
+def test_on_reconnect(websocket_instance: SampleWebSocket):
     """
     Test the _on_reconnect method to ensure the on_reconnect callback is executed.
     """
@@ -238,7 +238,7 @@ def test_on_reconnect(websocket_instance: TestWebSocket):
 
 
 # Test: 9
-def test_stop_retry(websocket_instance: TestWebSocket):
+def test_stop_retry(websocket_instance: SampleWebSocket):
     """
     Test the stop_retry method to ensure retrying is properly stopped.
     """
@@ -250,7 +250,7 @@ def test_stop_retry(websocket_instance: TestWebSocket):
 
 
 # Test: 10
-def test_stop_reactor(mock_reactor: MockType, websocket_instance: TestWebSocket):
+def test_stop_reactor(mock_reactor: MockType, websocket_instance: SampleWebSocket):
     """
     Test the stop method to ensure the reactor is stopped.
     """

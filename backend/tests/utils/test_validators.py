@@ -12,7 +12,7 @@ from app.utils.validators import (
 )
 
 
-def test_validate_and_format_stock_symbol():
+def test_validate_and_format_stock_symbol() -> None:
     """
     Test function to validate and format stock symbols.
 
@@ -37,7 +37,7 @@ def test_validate_and_format_stock_symbol():
         }
 
 
-def test_validate_index_symbol():
+def test_validate_index_symbol() -> None:
     """
     Test function to validate index symbol.
 
@@ -54,13 +54,14 @@ def test_validate_index_symbol():
     # Test invalid index symbol
     with pytest.raises(HTTPException) as http_exc:
         validate_index_symbol("XYZ")
+
         assert http_exc.value.status_code == 404
         assert http_exc.value.detail == {
             "Error": "XYZ is not a valid index symbol. Please refer nse official website to get index symbols"
         }
 
 
-def test_validate_derivative_symbol_with_type():
+def test_validate_derivative_symbol_with_type() -> None:
     """
     Test function to validate derivative symbol and type.
 
@@ -74,10 +75,10 @@ def test_validate_derivative_symbol_with_type():
 
     """
     # Test valid derivative symbol and type
-    assert validate_derivative_symbol_with_type("NIFTY", "index") is None
+    validate_derivative_symbol_with_type("NIFTY", "index")  # Should not raise
 
     # Test valid stock derivative symbol and type
-    assert validate_derivative_symbol_with_type("TCS", "stock") is None
+    validate_derivative_symbol_with_type("TCS", "stock")  # Should not raise
 
     # Test invalid derivative symbol and type
     with pytest.raises(HTTPException) as http_exc:
@@ -109,6 +110,7 @@ def test_validate_derivative_symbol_with_type():
     # Test invalid derivative symbol with stock type
     with pytest.raises(HTTPException) as http_exc:
         validate_derivative_symbol_with_type("NIFTY", "stock")
+
         assert http_exc.value.status_code == 400
         assert http_exc.value.detail == {
             "Error": "NIFTY is not a valid derivative symbol. "
@@ -116,7 +118,7 @@ def test_validate_derivative_symbol_with_type():
         }
 
 
-def test_get_date_format():
+def test_get_date_format() -> None:
     """
     Test function to check the get_date_format function.
 
@@ -140,7 +142,7 @@ def test_get_date_format():
     assert get_date_format("09/09-2023") == "%d/%m/%Y"
 
 
-def test_validate_and_reformat_expiry_date():
+def test_validate_and_reformat_expiry_date() -> None:
     """
     Test function to validate and reformat expiry date.
 

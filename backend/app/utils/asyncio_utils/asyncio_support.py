@@ -40,7 +40,7 @@ class AsyncioLoop(metaclass=Singleton):
         ``AbstractEventLoop``
             The singleton event loop instance
         """
-        if cls._loop is None:
+        if cls._loop is None or cls._loop.is_closed():
             cls._loop = asyncio.new_event_loop()
             asyncio.set_event_loop(cls._loop)
             _setup_exception_handling(cls._loop)
@@ -119,6 +119,7 @@ def _install_twisted_reactor(loop: AbstractEventLoop) -> None:
         return
 
     try:
+
         logger.info("Installing Twisted AsyncioSelectorReactor...")
         asyncioreactor.install(loop)
         logger.info("Twisted reactor installed successfully.")

@@ -81,6 +81,7 @@ def test_create_user(session, test_user):
     # Test: 1.1 ( Verify the user was added to the database )
     user = get_user(test_user.user_id, session=session)
     assert user.user_id == test_user.user_id
+    session.expunge(test_user)
 
     # Test: 1.2 ( Verify raising exception when user already exists )
     new_user = User(**test_user.model_dump())

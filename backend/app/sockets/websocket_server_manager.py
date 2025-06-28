@@ -86,6 +86,7 @@ class RedisPubSubManager(metaclass=Singleton):
             return False
 
         try:
+            self.redis.ping()
             self.subscribed_channels[channel] = callback
             self.channel_activity[channel] = time.time()  # Track subscription time
 
@@ -99,6 +100,7 @@ class RedisPubSubManager(metaclass=Singleton):
 
             # Store the task for later cancellation
             self.tasks[channel] = task
+
             logger.info("Subscribed to Redis channel: %s", channel)
             return True
 
