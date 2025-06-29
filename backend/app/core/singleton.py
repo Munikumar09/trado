@@ -32,8 +32,9 @@ class Singleton(type):
 
     def __call__(cls, *args, **kwargs):
         """
-        Create a new instance of a class only if it doesn't already exist.
-        Otherwise, return the existing instance.
+        Ensures that only one instance of the class is created, returning the existing instance if it already exists.
+        
+        This method provides thread-safe singleton instantiation by synchronizing instance creation across threads.
         """
         # Fast path for when instance already exists
         if cls in cls._instances:
@@ -51,8 +52,9 @@ class Singleton(type):
     @classmethod
     def clear_instance(mcs, target_cls: Type) -> None:
         """
-        Clear the singleton instance for the given class.
-        Useful for testing purposes.
+        Removes the stored singleton instance for the specified class.
+        
+        Primarily intended for testing scenarios where resetting the singleton instance is necessary.
         """
         with mcs._lock:
             if target_cls in mcs._instances:

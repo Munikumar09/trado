@@ -34,6 +34,11 @@ class CSVDataSaver(DataSaver):
     """
 
     def __init__(self, consumer: Consumer, csv_file_path: str | Path) -> None:
+        """
+        Initialize a CSVDataSaver with a Kafka consumer and a target CSV file path.
+        
+        The CSV file name is automatically suffixed with the current date in YYYY_MM_DD format. If the parent directory does not exist, it is created.
+        """
         self.consumer = consumer
 
         if isinstance(csv_file_path, str):
@@ -47,7 +52,9 @@ class CSVDataSaver(DataSaver):
 
     def retrieve_and_save(self):
         """
-        Retrieve the data from the kafka consumer and save it to the csv file.
+        Continuously consumes messages from the Kafka topic and appends them as rows to the CSV file.
+        
+        Messages are decoded from JSON and written to the CSV file, with the header row written on the first message. The method runs indefinitely until interrupted, and ensures the Kafka consumer is closed and the total number of messages saved is logged upon completion or error.
         """
         idx = 0
         try:
@@ -80,13 +87,10 @@ class CSVDataSaver(DataSaver):
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["CSVDataSaver"]:
         """
-        Initialize the CSVDataSaver object from the given configuration.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing the necessary information to
-            initialize the CSVDataSaver object
+        Create a CSVDataSaver instance from a configuration object.
+        
+        Returns:
+            CSVDataSaver: An initialized instance if configuration is valid, otherwise None.
         """
         consumer = get_kafka_consumer(
             {

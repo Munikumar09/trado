@@ -60,11 +60,23 @@ def connection_cfg() -> Dict[str, Any]:
 
 @pytest.fixture(autouse=True)
 def smart_socket_mock(mocker: MockerFixture) -> Any:
+    """
+    Pytest fixture that patches the `UplinkSocket` class in the uplinksocket_connection module.
+    
+    Returns:
+        The mocked `UplinkSocket` class.
+    """
     return mocker.patch("app.sockets.connections.uplinksocket_connection.UplinkSocket")
 
 
 @pytest.fixture(autouse=True)
 def mock_producer(mocker: MockerFixture):
+    """
+    Automatically patches the `init_from_cfg` function in the uplinksocket_connection module for all tests.
+    
+    Returns:
+        MagicMock: The mock object replacing `init_from_cfg`.
+    """
     return mocker.patch("app.sockets.connections.uplinksocket_connection.init_from_cfg")
 
 
@@ -72,6 +84,15 @@ def mock_producer(mocker: MockerFixture):
 def connection(
     connection_cfg: Dict[str, Any],
 ) -> UplinkSocketConnection:
+    """
+    Creates an `UplinkSocketConnection` instance from the provided configuration dictionary.
+    
+    Parameters:
+        connection_cfg (Dict[str, Any]): Configuration data for initializing the connection.
+    
+    Returns:
+        UplinkSocketConnection: The initialized connection instance.
+    """
     cfg = OmegaConf.create(connection_cfg)
 
     return cast(UplinkSocketConnection, UplinkSocketConnection.from_cfg(cfg))
@@ -97,7 +118,9 @@ def test_init_from_cfg_valid_cfg(
     expected_tokens: Dict[int, str],
 ) -> None:
     """
-    Test the initialization of the UplinkSocketConnection object from a valid configuration.
+    Test that `UplinkSocketConnection` is correctly initialized from a valid configuration.
+    
+    Verifies that the connection object is created, the socket is initialized with the provider config and producer, and the expected tokens are set.
     """
 
     cfg = OmegaConf.create(connection_cfg)

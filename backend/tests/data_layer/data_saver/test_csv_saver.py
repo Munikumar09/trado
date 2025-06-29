@@ -18,7 +18,13 @@ from app.utils.file_utils import read_csv
 @pytest.fixture
 def sample_csv_path(temp_dir):
     """
-    Sample CSV file path in temp directory.
+    Returns a sample CSV file path located within the provided temporary directory.
+    
+    Parameters:
+        temp_dir: The path to a temporary directory.
+    
+    Returns:
+        Path: The full path to 'test_data.csv' within the temporary directory.
     """
     return Path(temp_dir) / "test_data.csv"
 
@@ -26,7 +32,10 @@ def sample_csv_path(temp_dir):
 @pytest.fixture
 def mock_consumer():
     """
-    Mock Kafka consumer.
+    Provides a mock Kafka consumer with stubbed `poll` and `close` methods for use in tests.
+    
+    Returns:
+        MagicMock: A mock Kafka consumer instance with `poll` and `close` methods preset to return `None`.
     """
     consumer = MagicMock()
     consumer.poll.return_value = None
@@ -37,7 +46,13 @@ def mock_consumer():
 @pytest.fixture
 def valid_config(temp_dir):
     """
-    Valid configuration for CSVDataSaver.
+    Create a valid OmegaConf configuration for initializing a CSVDataSaver instance.
+    
+    Parameters:
+        temp_dir (str or Path): Temporary directory path where the CSV file will be created.
+    
+    Returns:
+        OmegaConf: Configuration object with CSV file path and Kafka streaming settings.
     """
     return OmegaConf.create(
         {
@@ -54,7 +69,10 @@ def valid_config(temp_dir):
 @pytest.fixture
 def mock_get_kafka_consumer(mocker):
     """
-    Mock get_kafka_consumer function.
+    Pytest fixture that patches the `get_kafka_consumer` function in the CSV saver module.
+    
+    Returns:
+        MagicMock: The patched mock of `get_kafka_consumer`.
     """
     return mocker.patch("app.data_layer.data_saver.saver.csv_saver.get_kafka_consumer")
 
@@ -62,7 +80,7 @@ def mock_get_kafka_consumer(mocker):
 @pytest.fixture
 def mock_logger(mocker):
     """
-    Mock logger.
+    Provides a pytest fixture that returns a mocked logger for the CSV saver module.
     """
     return mocker.patch("app.data_layer.data_saver.saver.csv_saver.logger")
 
@@ -70,7 +88,10 @@ def mock_logger(mocker):
 @pytest.fixture(autouse=True)
 def fixed_datetime(mocker):
     """
-    Mock datetime.now() for consistent testing.
+    Fixture that mocks `datetime.now()` to always return a fixed date string for consistent test results.
+    
+    Returns:
+        MagicMock: The mocked datetime module with `now().strftime()` returning "2024_01_01".
     """
     mock_dt = mocker.patch("app.data_layer.data_saver.saver.csv_saver.datetime")
     mock_dt.now.return_value.strftime.return_value = "2024_01_01"
@@ -79,7 +100,15 @@ def fixed_datetime(mocker):
 
 def validate_csv_data_saver_instance(saver, mock_consumer, csv_file_path):
     """
-    Helper function to validate CSVDataSaver instance.
+    Assert that a CSVDataSaver instance is correctly initialized with the expected consumer and CSV file path.
+    
+    Parameters:
+        saver: The CSVDataSaver instance to validate.
+        mock_consumer: The expected Kafka consumer instance.
+        csv_file_path: The base file path used to construct the expected CSV file.
+    
+    Raises:
+        AssertionError: If any of the validation checks fail.
     """
     assert isinstance(saver, CSVDataSaver)
     assert saver.consumer == mock_consumer
@@ -93,7 +122,7 @@ def validate_csv_data_saver_instance(saver, mock_consumer, csv_file_path):
 
 def test_init_with_string_path(mock_consumer, valid_config):
     """
-    Test initialization with string path.
+    Test that CSVDataSaver initializes correctly when provided with a CSV file path as a string.
     """
 
     saver = CSVDataSaver(mock_consumer, valid_config.csv_file_path)
@@ -102,7 +131,7 @@ def test_init_with_string_path(mock_consumer, valid_config):
 
 def test_init_with_path_object(mock_consumer, valid_config):
     """
-    Test initialization with Path object.
+    Test that CSVDataSaver initializes correctly when provided a Path object as the CSV file path.
     """
     saver = CSVDataSaver(mock_consumer, Path(valid_config.csv_file_path))
     validate_csv_data_saver_instance(saver, mock_consumer, valid_config.csv_file_path)
@@ -110,7 +139,9 @@ def test_init_with_path_object(mock_consumer, valid_config):
 
 def test_init_with_existing_directory(mock_consumer, temp_dir):
     """
-    Test initialization when directory already exists.
+    Test that CSVDataSaver initializes correctly when the target directory already exists.
+    
+    Verifies that the CSV file path is created with the expected date suffix and that the directory is present.
     """
     existing_dir = Path(temp_dir) / "existing"
     existing_dir.mkdir()
@@ -127,7 +158,7 @@ def test_init_with_existing_directory(mock_consumer, temp_dir):
 
 def test_init_from_config(valid_config):
     """
-    Test initialization using `init_from_cfg` function.
+    Tests that a `CSVDataSaver` instance is correctly initialized from a valid configuration using `init_from_cfg`.
     """
     saver = init_from_cfg(valid_config, DataSaver)
     validate_csv_data_saver_instance(saver, saver.consumer, valid_config.csv_file_path)
@@ -135,7 +166,9 @@ def test_init_from_config(valid_config):
 
 def test_from_cfg_success(valid_config, mock_get_kafka_consumer, mock_consumer):
     """
-    Test successful creation from configuration.
+    Test that `CSVDataSaver.from_cfg` successfully creates an instance when provided with a valid configuration and a working Kafka consumer.
+    
+    Verifies that the returned saver is correctly initialized and that the Kafka consumer creation function is called once.
     """
     mock_get_kafka_consumer.return_value = mock_consumer
 
@@ -148,7 +181,7 @@ def test_from_cfg_success(valid_config, mock_get_kafka_consumer, mock_consumer):
 
 def test_from_cfg_kafka_consumer_creation_fails(valid_config, mock_get_kafka_consumer):
     """
-    Test when Kafka consumer creation fails.
+    Test that `CSVDataSaver.from_cfg` returns `None` when Kafka consumer creation fails.
     """
     mock_get_kafka_consumer.return_value = None
 
@@ -161,7 +194,7 @@ def test_from_cfg_missing_csv_file_path(
     mock_get_kafka_consumer, mock_consumer, mock_logger
 ):
     """
-    Test when csv_file_path is missing from config.
+    Test that CSVDataSaver.from_cfg returns None and logs an error when 'csv_file_path' is missing from the configuration.
     """
     config = OmegaConf.create(
         {"streaming": {"kafka_server": "localhost:9092", "kafka_topic": "test_topic"}}
@@ -180,7 +213,7 @@ def test_from_cfg_empty_csv_file_path(
     mock_get_kafka_consumer, mock_consumer, mock_logger
 ):
     """
-    Test when csv_file_path is empty.
+    Test that CSVDataSaver.from_cfg returns None and logs an error when the csv_file_path in the configuration is an empty string.
     """
     config = OmegaConf.create(
         {
@@ -205,7 +238,7 @@ def test_from_cfg_none_csv_file_path(
     mock_get_kafka_consumer, mock_consumer, mock_logger
 ):
     """
-    Test when csv_file_path is None.
+    Test that `CSVDataSaver.from_cfg` returns None and logs an error when `csv_file_path` is None in the configuration.
     """
     config = OmegaConf.create(
         {
@@ -230,7 +263,7 @@ def test_from_cfg_kafka_config_construction(
     valid_config, mock_get_kafka_consumer, mock_consumer
 ):
     """
-    Test that Kafka configuration is constructed correctly.
+    Verify that the Kafka consumer configuration passed to the consumer creation function matches the expected parameters when initializing CSVDataSaver from configuration.
     """
     mock_get_kafka_consumer.return_value = mock_consumer
 
@@ -254,7 +287,9 @@ def test_retrieve_and_save_single_message(
     mock_logger,
 ):
     """
-    Test saving a single message to CSV.
+    Test that a single Kafka message is retrieved and saved to a CSV file.
+    
+    Verifies that the CSV file is created with the correct header and data row, the Kafka consumer is closed after processing, and the appropriate log message is emitted.
     """
     mock_consumer.poll.side_effect = [
         mock_kafka_message,
@@ -287,7 +322,7 @@ def test_retrieve_and_save_multiple_messages(
     mock_consumer, sample_csv_path, sample_data_list, mock_logger
 ):
     """
-    Test saving multiple messages to CSV.
+    Test that multiple Kafka messages are correctly saved to a CSV file, verifying header and row content, and that the message count is logged.
     """
     messages = []
     for data in sample_data_list:
@@ -317,7 +352,9 @@ def test_retrieve_and_save_multiple_messages(
 
 def test_retrieve_and_save_no_messages(mock_consumer, sample_csv_path, mock_logger):
     """
-    Test behavior when no messages are received.
+    Test that `CSVDataSaver.retrieve_and_save` creates an empty CSV file when no messages are received from the consumer.
+    
+    Verifies that the file is created with zero size (no header or data), the consumer is closed, and the correct log message is emitted.
     """
     mock_consumer.poll.side_effect = [None, None, None, KeyboardInterrupt()]
 
@@ -359,7 +396,7 @@ def test_retrieve_and_save_json_decode_error(
     mock_consumer, sample_csv_path, mock_logger
 ):
     """
-    Test handling of JSON decode errors.
+    Test that `CSVDataSaver.retrieve_and_save` handles invalid JSON messages gracefully by logging an error and closing the consumer without raising an exception.
     """
     message = MagicMock()
     message.error.return_value = None
@@ -377,7 +414,7 @@ def test_retrieve_and_save_file_permission_error(
     mock_consumer, temp_dir, mocker, mock_logger
 ):
     """
-    Test handling of file permission errors.
+    Test that `CSVDataSaver.retrieve_and_save` handles file permission errors by logging an error and closing the Kafka consumer.
     """
     # Mock open to raise PermissionError
     mocker.patch("builtins.open", side_effect=PermissionError("Permission denied"))
@@ -395,7 +432,7 @@ def test_retrieve_and_save_ensures_consumer_closed_on_exception(
     mock_consumer, sample_csv_path, mocker, mock_logger
 ):
     """
-    Test that consumer is always closed even when exceptions occur.
+    Test that the Kafka consumer is closed and an error is logged if an exception occurs during file operations in `retrieve_and_save`.
     """
     # Mock open to raise an exception
     open_mocker = mocker.patch("builtins.open", side_effect=IOError("Disk full"))
@@ -413,7 +450,7 @@ def test_retrieve_and_save_file_flushing(
     mock_consumer, sample_csv_path, mock_kafka_message, mocker
 ):
     """
-    Test that file is flushed after each message.
+    Test that the CSV file is flushed after each message is written during retrieval and saving.
     """
     mock_file = mocker.MagicMock()
     mocker.patch("builtins.open", return_value=mock_file)
@@ -430,7 +467,7 @@ def test_retrieve_and_save_file_flushing(
 
 def test_retrieve_and_save_empty_json_object(mock_consumer, sample_csv_path):
     """
-    Test handling of empty JSON objects.
+    Test that `CSVDataSaver` correctly writes an empty header and row to the CSV file when processing an empty JSON object from Kafka.
     """
     message = MagicMock()
     message.error.return_value = None
@@ -452,7 +489,7 @@ def test_retrieve_and_save_empty_json_object(mock_consumer, sample_csv_path):
 
 def test_retrieve_and_save_different_message_structures(mock_consumer, sample_csv_path):
     """
-    Test handling of messages with different structures.
+    Test that `CSVDataSaver` correctly writes messages with differing JSON structures to a CSV file, using the header from the first message and preserving row order.
     """
     message_data = [{"a": 1, "b": 2}, {"c": 3, "d": 4}]
     messages = []
@@ -480,7 +517,9 @@ def test_retrieve_and_save_different_message_structures(mock_consumer, sample_cs
 
 def test_retrieve_and_save_unicode_content(mock_consumer, sample_csv_path):
     """
-    Test handling of Unicode content in messages.
+    Tests that Unicode characters in Kafka messages are correctly written to the CSV file by CSVDataSaver.
+    
+    Verifies that Unicode strings and emojis are preserved in the CSV output and that numeric values are formatted as expected.
     """
     message = MagicMock()
     message.error.return_value = None
@@ -509,7 +548,7 @@ def test_retrieve_and_save_unicode_content(mock_consumer, sample_csv_path):
 
 def test_consumer_poll_timeout_handling(mock_consumer, sample_csv_path):
     """
-    Test that polling timeouts are handled correctly.
+    Test that the Kafka consumer's poll method is called with a timeout of 1.0 seconds during message retrieval, and that polling timeouts are handled until interrupted.
     """
     mock_consumer.poll.side_effect = [None, None, None, KeyboardInterrupt()]
 
@@ -524,7 +563,7 @@ def test_consumer_poll_timeout_handling(mock_consumer, sample_csv_path):
 
 def test_very_large_json_message(mock_consumer, sample_csv_path):
     """
-    Test handling of very large JSON messages.
+    Tests that CSVDataSaver correctly processes and saves a single very large JSON message with 1000 fields, ensuring all fields are written to the CSV file.
     """
     large_data = {f"field_{i}": f"value_{i}" for i in range(1000)}
     message = MagicMock()
@@ -546,7 +585,7 @@ def test_very_large_json_message(mock_consumer, sample_csv_path):
 
 def test_nested_json_structures(mock_consumer, sample_csv_path):
     """
-    Test handling of nested JSON structures (should be flattened to string).
+    Test that nested JSON objects and arrays in Kafka messages are converted to string representations when saved to CSV.
     """
     nested_data = {
         "simple_field": "value",
@@ -575,7 +614,9 @@ def test_nested_json_structures(mock_consumer, sample_csv_path):
 
 def test_null_values_in_json(mock_consumer, sample_csv_path):
     """
-    Test handling of null values in JSON.
+    Test that JSON null values are converted to empty strings when saving to CSV.
+    
+    Verifies that fields with `None` values in the input JSON are written as empty strings in the resulting CSV file.
     """
     data_with_nulls = {"symbol": "TEST", "price": None, "volume": 100, "metadata": None}
     message = MagicMock()
@@ -596,7 +637,7 @@ def test_null_values_in_json(mock_consumer, sample_csv_path):
 
 def test_special_characters_in_csv(mock_consumer, sample_csv_path):
     """
-    Test handling of special CSV characters (commas, quotes, newlines).
+    Test that CSVDataSaver correctly escapes and writes fields containing commas, quotes, and newlines to the CSV file.
     """
     special_data = {
         "field_with_comma": "value, with comma",
@@ -628,7 +669,9 @@ def test_special_characters_in_csv(mock_consumer, sample_csv_path):
 
 def test_end_to_end_workflow(valid_config, mock_get_kafka_consumer, sample_data_list):
     """
-    Test complete end-to-end workflow from config to file output.
+    Tests the full workflow of CSVDataSaver from configuration initialization to saving Kafka messages to a CSV file.
+    
+    Verifies that messages are correctly polled, written to the CSV with the appropriate header and data rows, and that the output file matches the expected content.
     """
     # Setup
     mock_consumer = MagicMock()
@@ -665,7 +708,9 @@ def test_end_to_end_workflow(valid_config, mock_get_kafka_consumer, sample_data_
 
 def test_real_file_operations(mock_consumer, temp_dir, sample_data_list):
     """
-    Test with real file operations (no mocking of file I/O).
+    Tests the CSVDataSaver's ability to write messages to a real CSV file without mocking file I/O.
+    
+    Verifies that the file is created, contains the expected header and data rows, and that actual file operations succeed.
     """
     csv_path = Path(temp_dir) / "real_test.csv"
 
@@ -698,7 +743,7 @@ def test_real_file_operations(mock_consumer, temp_dir, sample_data_list):
 
 def test_concurrent_access_simulation(mock_consumer, temp_dir):
     """
-    Test behavior that might occur with concurrent access.
+    Simulates concurrent access by pre-creating the CSV file and verifies that `CSVDataSaver` appends data rather than overwriting the file during message saving.
     """
     csv_path = Path(temp_dir) / "concurrent_test.csv"
 
@@ -724,7 +769,7 @@ def test_concurrent_access_simulation(mock_consumer, temp_dir):
 
 def test_message_counter_accuracy(mock_consumer, sample_csv_path, mock_logger):
     """
-    Test that message counter is accurate.
+    Verify that the message counter accurately reflects the number of messages processed and saved to CSV.
     """
     num_messages = 5
     messages = []
@@ -746,7 +791,7 @@ def test_message_counter_accuracy(mock_consumer, sample_csv_path, mock_logger):
 
 def test_resource_cleanup_on_normal_exit(mock_consumer, sample_csv_path):
     """
-    Test resource cleanup on normal operation.
+    Test that the Kafka consumer is properly closed when a KeyboardInterrupt occurs during message retrieval.
     """
     mock_consumer.poll.side_effect = [KeyboardInterrupt()]
     saver = CSVDataSaver(mock_consumer, sample_csv_path)
@@ -759,7 +804,7 @@ def test_resource_cleanup_on_normal_exit(mock_consumer, sample_csv_path):
 
 def test_file_handle_management(mock_consumer, sample_csv_path, mocker):
     """
-    Test that file handles are properly managed.
+    Test that file handles are opened with the correct parameters and properly closed using context managers during CSV writing.
     """
     mock_file = mocker.MagicMock()
     mock_open_context = mocker.patch("builtins.open", return_value=mock_file)

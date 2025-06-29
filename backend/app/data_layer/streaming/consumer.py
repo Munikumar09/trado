@@ -56,23 +56,12 @@ class Consumer(ABC, Registrable, metaclass=ConsumerMeta):
     @abstractmethod
     async def consume_messages(self) -> Any:
         """
-        Consumes and processes messages from a data source.
-
-        This abstract method must be implemented by all concrete consumer classes.
-        Implementations should handle the complete message consumption lifecycle
-        including connection management, message processing, and error handling.
-
-        Returns
-        -------
-        ``Any``
-            The result of the message consumption process, which can vary
-            depending on the implementation. This could be a list of messages,
-            a status report, or any other relevant information.
-
-        Raises
-        ------
-        ``NotImplementedError``
-            If the method is not implemented by a subclass
+        Consume and process messages from a data source.
+        
+        This abstract method must be implemented by subclasses to define the logic for message consumption, including connection management and error handling.
+        
+        Returns:
+            The result of the message consumption process, which may vary by implementation.
         """
         raise NotImplementedError
 
@@ -80,26 +69,8 @@ class Consumer(ABC, Registrable, metaclass=ConsumerMeta):
     @abstractmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["Consumer"]:
         """
-        Creates a consumer instance from configuration.
-
-        Factory method to instantiate a concrete consumer implementation
-        using parameters specified in a configuration object.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing parameters required to
-            initialize the consumer, such as:
-
-        Returns
-        -------
-        consumer: ``Consumer | None``
-            An initialized concrete consumer instance ready to consume messages,
-            or None if the consumer cannot be created with the given configuration
-
-        Raises
-        ------
-        ``NotImplementedError``
-            If the method is not implemented by a subclass
+        Create a consumer instance from a configuration object.
+        
+        This abstract factory method must be implemented by subclasses to instantiate a concrete consumer using parameters from the provided configuration. Returns an instance of the consumer or None if instantiation is not possible.
         """
         raise NotImplementedError

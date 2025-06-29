@@ -70,12 +70,10 @@ class FastAPIApp(metaclass=Singleton):
     @classmethod
     def get_fast_api_app(cls) -> FastAPI:
         """
-        Get the FastAPI application instance.
-
-        Returns
-        -------
-        ``FastAPI``
-            The FastAPI application instance.
+        Returns the singleton FastAPI application instance, creating it with CORS middleware if it does not already exist.
+        
+        Returns:
+            FastAPI: The FastAPI application instance.
         """
         if cls._app is None:
             cls._app = FastAPI(
@@ -105,14 +103,14 @@ app = FastAPIApp.get_fast_api_app()  # pylint: disable=invalid-name
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """
-    Global exception handler for all unhandled exceptions in the application.
-
-    Parameters
-    ----------
-    request: ``Request``
-        The incoming request that caused the exception.
-    exc: ``Exception``
-        The exception that was raised.
+    Handles all uncaught exceptions during request processing and returns a generic internal server error response.
+    
+    Parameters:
+        request (Request): The incoming HTTP request.
+        exc (Exception): The unhandled exception that occurred.
+    
+    Returns:
+        JSONResponse: A response with HTTP 500 status and a generic error message.
     """
     logger.exception("Unhandled exception in request %s: %s", request.url, exc)
     return JSONResponse(
@@ -124,16 +122,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 async def startup_event():
     """
-    Application startup event to initialize services.
-
-    Initializes:
-    - Database for tokens
-    - Redis connection pool
-    - FastAPI rate limiter
-    - Kafka consumer task
-    - WebSocket server (if Twisted is available)
-
-    Handles cleanup on startup failure.
+    Handles application startup by initializing core services including the tokens database, Redis connection, rate limiter, Kafka consumer, and optionally the WebSocket server.
+    
+    On failure during initialization, logs the error and terminates the process.
     """
     logger.info("Starting %s v%s...", SERVICE_NAME, API_VERSION)
 
@@ -212,12 +203,9 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """
-    Application shutdown event to clean up resources.
-
-    Performs cleanup:
-    - Stops WebSocket server if running
-    - Cancels Kafka consumer task
-    - Closes Redis connections and all managed resources
+    Handles application shutdown by cleaning up resources such as the WebSocket server and Kafka consumer task.
+    
+    Stops the WebSocket server if it is running, cancels the Kafka consumer task with timeout and cancellation handling, and logs the shutdown process. Ensures that resources are properly released before application exit.
     """
     if not AppState.startup_complete:
         logger.info("Shutdown called before startup completed")

@@ -43,7 +43,10 @@ model_classes = {
 
 def create_database_if_not_exists() -> bool:
     """
-    Creates the database if it doesn't already exist and returns True if created, False otherwise.
+    Create the target PostgreSQL database if it does not already exist.
+    
+    Returns:
+        bool: True if the database was created, False if it already existed.
     """
     conn = None
     try:
@@ -81,7 +84,13 @@ def create_database_if_not_exists() -> bool:
 
 def drop_database_if_created(created: bool):
     """
-    Drops the database only if it was created by the create_database_if_not_exists function.
+    Drop the target PostgreSQL database if it was created during the current session.
+    
+    Parameters:
+    	created (bool): Indicates whether the database was created in this session. The database is dropped only if this is True.
+    
+    Raises:
+    	psycopg2.Error: If an error occurs while dropping the database.
     """
     if not created:
         logger.info("Skipping database drop as it was not created in this session.")
@@ -139,7 +148,9 @@ def set_env_vars(monkeypatch: MonkeyPatch):
 # Test the creation of the database and tables
 def test_create_db_and_tables(set_env_vars):
     """
-    Test the create_db_and_tables function to ensure it creates the tables.
+    Tests that the database and all expected tables are created, and verifies that each table is initially empty.
+    
+    This test sets up environment variables, creates the test database if needed, checks that no tables exist before creation, invokes table creation, and asserts that all model tables are present and empty. The test cleans up by dropping the database if it was newly created.
     """
     created = create_database_if_not_exists()
     try:

@@ -141,17 +141,13 @@ def create_dir(dir_path: str | Path) -> Path:
 
 def read_csv(file_path: str | Path) -> list:
     """
-    Read the data from given csv file path.
-
+    Read all rows from a CSV file and return them as a list.
+    
     Parameters:
-    -----------
-    file_path: ``str | Path``
-        Path to the csv file
-
-    Return:
-    -------
-    ``list``
-        Loaded data from the given file path
+        file_path (str | Path): Path to the CSV file.
+    
+    Returns:
+        list: List of rows, where each row is represented as a list of strings.
     """
     with open(file_path, "r", encoding="utf-8") as fp:
         reader = csv.reader(fp)
@@ -161,17 +157,13 @@ def read_csv(file_path: str | Path) -> list:
 
 def read_jsonl(file_path: str | Path) -> list:
     """
-    Read the data from the given jsonl file path.
-
-    Parameters
-    ----------
-    file_path: ``str | Path``
-        Path to the jsonl path
-
-    Return
-    ------
-    ``list``
-        Loaded data from the given jsonl file path
+    Read and parse all JSON objects from a JSON Lines (jsonl) file.
+    
+    Parameters:
+        file_path (str | Path): Path to the jsonl file.
+    
+    Returns:
+        list: A list of JSON objects, one for each line in the file.
     """
     json_data = []
     with open(file_path, "r", encoding="utf-8") as f:
@@ -183,14 +175,9 @@ def read_jsonl(file_path: str | Path) -> list:
 
 def write_jsonl(file_path: str | Path, data: list, ensure_ascii: bool = False):
     """
-    Write the data into the given jsonl file path.
-
-    Parameters
-    ----------
-    file_path: ``str | Path``
-        Destination file path to write data
-    data: ``list``
-        Data to be written into the file
+    Write a list of data items to a JSON Lines (jsonl) file.
+    
+    Each item in the list is serialized as a JSON object and written as a separate line in the file. The `ensure_ascii` parameter controls whether non-ASCII characters are escaped in the output.
     """
     with open(file_path, "w", encoding="utf-8") as f:
         for item in data:

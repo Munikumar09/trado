@@ -39,11 +39,9 @@ def test_validate_and_format_stock_symbol() -> None:
 
 def test_validate_index_symbol() -> None:
     """
-    Test function to validate index symbol.
-
-    This function tests the validity of an index symbol by checking if it
-    exists in the NSE official website. It tests both valid and invalid
-    index symbols and raises an HTTPException if the symbol is invalid.
+    Tests the validate_index_symbol function for correct handling of valid and invalid index symbols.
+    
+    Verifies that valid index symbols are correctly URL-encoded and that invalid symbols raise an HTTPException with the expected status code and error message.
     """
     # Test valid index symbol
     assert validate_index_symbol("NIFTY 50") == "NIFTY%2050"
@@ -63,16 +61,9 @@ def test_validate_index_symbol() -> None:
 
 def test_validate_derivative_symbol_with_type() -> None:
     """
-    Test function to validate derivative symbol and type.
-
-    This function tests the following scenarios:
-    - Valid derivative symbol and type
-    - Valid stock derivative symbol and type
-    - Invalid derivative symbol and type
-    - Invalid derivative symbol
-    - Invalid derivative symbol with index type
-    - Invalid derivative symbol with stock type
-
+    Tests the validate_derivative_symbol_with_type function for correct handling of valid and invalid derivative symbol-type pairs.
+    
+    Verifies that valid symbol-type combinations do not raise exceptions, while invalid combinations raise HTTPException with appropriate status codes and error messages.
     """
     # Test valid derivative symbol and type
     validate_derivative_symbol_with_type("NIFTY", "index")  # Should not raise
@@ -120,11 +111,7 @@ def test_validate_derivative_symbol_with_type() -> None:
 
 def test_get_date_format() -> None:
     """
-    Test function to check the get_date_format function.
-
-    This function tests the get_date_format function with different date formats.
-    It checks if the function returns the correct date format string for each
-    input date format.
+    Tests the get_date_format function with various date string formats to ensure it returns the correct format string for each input.
     """
     # Test date format with "/"
     assert get_date_format("09/09/2023") == "%d/%m/%Y"

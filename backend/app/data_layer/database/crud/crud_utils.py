@@ -28,20 +28,10 @@ logger = get_logger(Path(__file__).name)
 
 def validate_model_attributes(model: type[SQLModel], attributes: dict[str, Any]):
     """
-    Validate the attributes of the model against the provided attributes.
-
-    Parameters
-    ----------
-    model: ``SQLModel``
-        The SQLAlchemy model class to validate the attributes
-    attributes: ``dict[str, Any]``
-        The attributes to validate against the model
-
-    Raises
-    ------
-    ``HTTPException``:
-        If the model does not have the specified attributes or if the attributes are
-        of the wrong type
+    Validates that the provided attribute keys exist in the SQLModel class and that their values match the expected types.
+    
+    Raises:
+        HTTPException: If no attributes are provided, if an attribute does not exist in the model, or if an attribute's value does not match the model's type annotation (including support for Union types).
     """
     if not attributes:
         raise HTTPException(
@@ -88,22 +78,13 @@ def get_conditions_list(
     model: type[SQLModel], condition_attributes: dict[str, str]
 ) -> list[BinaryExpression]:
     """
-    Generate a list of conditions based on the provided attributes. This function takes
-    a dictionary of attributes and their corresponding values as input. It generates a
-    list of SQLAlchemy BinaryExpression objects, which can be used as conditions in a
-    database query.
-
-    Parameters
-    ----------
-    sql_model: ``SQLModel``
-        The SQLAlchemy model class used to generate the conditions
-    condition_attributes: ``dict[str, str]``
-        A dictionary of attribute names and their corresponding values
-
-    Returns
-    -------
-    conditions: ``list[BinaryExpression]``
-        A list of SQLAlchemy BinaryExpression objects
+    Convert a dictionary of attribute-value pairs into SQLAlchemy equality conditions for querying.
+    
+    Parameters:
+        condition_attributes (dict[str, str]): Mapping of attribute names to values for condition generation.
+    
+    Returns:
+        list[BinaryExpression]: List of SQLAlchemy expressions representing attribute equality conditions.
     """
     return [getattr(model, key) == value for key, value in condition_attributes.items()]
 
@@ -198,44 +179,13 @@ def _upsert(
     session: Session,
 ):
     """
-    Upsert means insert the data into the table if it does not already exist.
-    If the data already exists, it will be updated with the new data.
-
-    Note
-    ----
-    This function is a private function and should not be used directly.
-    Use the `insert_data` function to upsert data into the table.
-
-    Parameters
-    ----------
-    model: ``SQLModel``
-        The SQLAlchemy model class to use for the upsert operation
-    upsert_data: ``list[dict[str, Any]]``
-        The data to upsert into the table
-    session: ``Session``
-        The SQLAlchemy session object to use for the database operations
-
-
-    Example:
-    --------
-    >>> If the table has the following data:
-    | id | symbol | price |
-    |----|--------|-------|
-    | 1  | AAPL   | 100   |
-    | 2  | MSFT   | 200   |
-
-    >>> If the following data is upserted:
-    | id | symbol | price |
-    |----|--------|-------|
-    | 1  | AAPL   | 150   |
-    | 3  | GOOGL  | 300   |
-
-    >>> The table will be updated as:
-    | id | symbol | price |
-    |----|--------|-------|
-    | 1  | AAPL   | 150   |
-    | 2  | MSFT   | 200   |
-    | 3  | GOOGL  | 300   |
+    Performs an upsert operation on the specified SQLModel table, inserting new rows or updating existing ones based on primary key conflicts.
+    
+    This function handles both SQLite and PostgreSQL dialects, using the appropriate conflict resolution strategy for each. For SQLite, data is inserted in batches with conflict resolution on primary keys. For PostgreSQL, an `ON CONFLICT DO UPDATE` statement is used. Raises an HTTP 500 error if the session is not bound to a database connection, or a ValueError for unsupported database types.
+    
+    Parameters:
+        model (type[SQLModel]): The SQLModel class representing the target table.
+        upsert_data (list[dict[str, Any]]): List of dictionaries containing the data to upsert.
     """
     if session.bind is None:
         raise HTTPException(
@@ -365,22 +315,9 @@ def insert_data(
     update_existing: bool = False,
 ) -> bool:
     """
-    Insert the provided data into the SQLModel table in the SQLite database. It
-    will handle both single and multiple data objects. If the data already exists in the table,
-    it will either update the existing data or ignore the new data based on the value of the
-    `update_existing` parameter
-
-    Parameters
-    ----------
-    model: ``SQLModel``
-        The SQLAlchemy model class to use for the insert operation
-    data: ``SQLModel | dict[str, Any] | list[SQLModel | dict[str, Any]] | None``
-        The data to insert into the table
-    session: ``Session``
-        The SQLModel session object to use for the database operations. If not provided,
-        a new session will be created from the database connection pool
-    update_existing: ``bool``, ( defaults = False )
-        If True, the existing data in the table will be updated with the new data
+    Insert one or more records into the specified SQLModel table, with optional upsert behavior.
+    
+    If `update_existing` is True, existing rows matching primary keys are updated; otherwise, conflicting inserts are ignored. Accepts single or multiple SQLModel instances or dictionaries. Returns True if insertion is attempted, or False if input data is empty or conversion yields no records.
     """
     if not data:
         logger.warning("Provided data is empty. Skipping insertion.")

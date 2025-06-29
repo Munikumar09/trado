@@ -54,7 +54,13 @@ def sample_instrument_price_data() -> dict[str, str | int | None]:
 @pytest.fixture
 def sample_instrument_price(sample_instrument_price_data) -> InstrumentPrice:
     """
-    Sample InstrumentPrice object
+    Create a sample InstrumentPrice object using provided price data.
+    
+    Parameters:
+        sample_instrument_price_data (dict): Dictionary containing instrument price attributes.
+    
+    Returns:
+        InstrumentPrice: An InstrumentPrice instance populated with sample data.
     """
     return InstrumentPrice(
         symbol=sample_instrument_price_data["symbol"],
@@ -76,7 +82,9 @@ def sample_instrument_price(sample_instrument_price_data) -> InstrumentPrice:
 @pytest.fixture(autouse=True)
 def create_insert_sample_data(session, sample_instrument, sample_instrument_price):
     """
-    Insert sample data into the database
+    Inserts sample instrument and instrument price data into the database session and commits the transaction.
+    
+    This fixture creates a duplicate of the sample instrument with a modified exchange ID and token, adds it along with the original sample instrument and sample instrument price to the session, and commits the changes.
     """
     bse_instrument = Instrument(
         **sample_instrument.model_dump(),

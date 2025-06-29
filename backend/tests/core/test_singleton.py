@@ -15,6 +15,12 @@ class MySingletonClass(metaclass=Singleton):
     """
 
     def __init__(self, value: str = "default"):
+        """
+        Initialize the singleton instance with a value and timestamp.
+        
+        Parameters:
+            value (str): The value to assign to the instance. Defaults to "default".
+        """
         self.value = value
         self.initialized_at = time.time()
 
@@ -29,6 +35,12 @@ class AnotherSingletonClass(metaclass=Singleton):
     """
 
     def __init__(self, name: str = "another"):
+        """
+        Initialize the singleton instance with a name attribute.
+        
+        Parameters:
+            name (str): The name to assign to the instance. Defaults to "another".
+        """
         self.name = name
 
 
@@ -40,6 +52,12 @@ class InitCounterSingleton(metaclass=Singleton):
     _init_count = 0
 
     def __init__(self, data: Any = None):
+        """
+        Initialize the singleton instance, incrementing the class-level initialization counter and storing the provided data.
+        
+        Parameters:
+            data (Any, optional): Data to associate with the instance. Defaults to None.
+        """
         InitCounterSingleton._init_count += 1
         self.data = data
         self.init_number = InitCounterSingleton._init_count
@@ -48,7 +66,7 @@ class InitCounterSingleton(metaclass=Singleton):
 @pytest.fixture(autouse=True)
 def clear_singleton_instances():
     """
-    Clear all singleton instances before each test to ensure test isolation.
+    Pytest fixture that clears singleton instances and resets counters before and after each test to ensure test isolation.
     """
     yield
     # Clean up after each test
@@ -60,7 +78,7 @@ def clear_singleton_instances():
 
 def test_basic_singleton_instance():
     """
-    Test that the same instance is returned for multiple instantiations.
+    Verify that multiple instantiations of the same singleton class return the identical instance and preserve the initial initialization arguments.
     """
     instance1 = MySingletonClass("first")
     instance2 = MySingletonClass("second")
@@ -75,7 +93,7 @@ def test_basic_singleton_instance():
 
 def test_singleton_with_different_classes():
     """
-    Test that different singleton classes maintain separate instances.
+    Verify that singleton instances are unique per class, ensuring different singleton classes do not share instances and that each preserves its own initialization arguments from the first instantiation.
     """
     my_instance1 = MySingletonClass("test1")
     my_instance2 = MySingletonClass("test2")
@@ -97,7 +115,7 @@ def test_singleton_with_different_classes():
 
 def test_clear_instance():
     """
-    Test the clear_instance method functionality.
+    Verify that clearing a singleton instance removes it, allowing a new instance to be created with different initialization arguments.
     """
     # Create an instance
     instance1 = MySingletonClass("original")
@@ -116,7 +134,7 @@ def test_clear_instance():
 
 def test_clear_instance_for_specific_class_only():
     """
-    Test that clearing an instance only affects the specified class.
+    Verify that clearing a singleton instance for one class does not affect singleton instances of other classes.
     """
     # Create instances of both classes
     my_instance = MySingletonClass("my_value")
@@ -144,7 +162,7 @@ def test_clear_instance_for_specific_class_only():
 
 def test_clear_non_existent_instance():
     """
-    Test that clearing a non-existent instance doesn't raise an error.
+    Verify that clearing a singleton instance that does not exist does not raise an error and allows normal instantiation afterward.
     """
     # This should not raise any exception
     Singleton.clear_instance(MySingletonClass)
@@ -156,14 +174,14 @@ def test_clear_non_existent_instance():
 
 def test_thread_safety_of_singleton():
     """
-    Test that singleton creation is thread-safe.
+    Verifies that singleton instance creation is thread-safe by concurrently instantiating the singleton in multiple threads and ensuring all threads receive the same instance without exceptions.
     """
     instances = []
     exceptions = []
 
     def create_instance(value: str):
         """
-        Function to create a singleton instance in a thread.
+        Creates a `MySingletonClass` instance with the given value and appends it to the shared instances list, capturing any exceptions that occur during instantiation.
         """
         try:
             instance = MySingletonClass(value)
@@ -202,7 +220,7 @@ def test_thread_safety_of_singleton():
 
 def test_singleton_instance_persists_attributes():
     """
-    Test that attributes set on singleton instances persist across instantiations.
+    Verify that attributes added to a singleton instance remain accessible across subsequent instantiations of the same class.
     """
     # Create first instance and set an attribute
     instance1 = MySingletonClass("test")
@@ -219,7 +237,7 @@ def test_singleton_instance_persists_attributes():
 
 def test_init_called_effectively_once():
     """
-    Test that __init__ is effectively called only once per singleton class.
+    Verify that the singleton's `__init__` method is called only once, regardless of multiple instantiations, and that only the first initialization arguments are used.
     """
     # Create multiple instances
     instance1 = InitCounterSingleton("data1")
@@ -241,12 +259,18 @@ def test_init_called_effectively_once():
 
 def test_thread_safety_with_thread_pool_executor():
     """
-    Test thread safety using ThreadPoolExecutor for more controlled concurrency.
+    Verifies that singleton instance creation remains thread-safe when using ThreadPoolExecutor, ensuring all concurrent threads receive the same instance and that initialization arguments from the first completed thread are retained.
     """
 
     def create_singleton(thread_id: int) -> tuple[int, MySingletonClass]:
         """
-        Create singleton and return thread_id and instance.
+        Creates a `MySingletonClass` singleton instance using the thread ID and returns a tuple of the thread ID and the singleton instance.
+        
+        Parameters:
+            thread_id (int): Identifier for the thread, used to initialize the singleton.
+        
+        Returns:
+            tuple[int, MySingletonClass]: A tuple containing the thread ID and the singleton instance.
         """
         instance = MySingletonClass(f"thread_{thread_id}")
         return thread_id, instance
@@ -270,7 +294,7 @@ def test_thread_safety_with_thread_pool_executor():
 
 def test_singleton_with_no_init_args():
     """
-    Test singleton behavior when no initialization arguments are provided.
+    Verify that a singleton class returns the same instance when instantiated without arguments and uses default initialization values.
     """
     instance1 = MySingletonClass()
     instance2 = MySingletonClass()
@@ -281,7 +305,7 @@ def test_singleton_with_no_init_args():
 
 def test_singleton_memory_cleanup_after_clear():
     """
-    Test that memory is properly cleaned up after clearing an instance.
+    Verify that clearing a singleton instance removes it from memory, allowing a new, distinct instance to be created with subsequent initialization arguments.
     """
     # Create an instance
     instance = MySingletonClass("test")
@@ -303,7 +327,7 @@ def test_singleton_memory_cleanup_after_clear():
 
 def test_multiple_clear_operations():
     """
-    Test multiple consecutive clear operations.
+    Verify that performing multiple consecutive clear operations on a singleton class does not cause errors and allows creation of a new, distinct instance afterward.
     """
     # Create instance
     instance1 = MySingletonClass("first")
@@ -322,7 +346,7 @@ def test_multiple_clear_operations():
 
 def test_singleton_inheritance_isolation():
     """
-    Test that inherited singleton classes maintain separate instances.
+    Verifies that singleton instances of a parent class and its child class are distinct, ensuring inheritance does not share singleton instances.
     """
 
     class ParentSingleton(metaclass=Singleton):
@@ -331,6 +355,12 @@ def test_singleton_inheritance_isolation():
         """
 
         def __init__(self, value="parent"):
+            """
+            Initialize the singleton instance with a specified value.
+            
+            Parameters:
+                value (str): The value to assign to the instance. Defaults to "parent".
+            """
             self.value = value
 
     class ChildSingleton(ParentSingleton):
@@ -339,6 +369,9 @@ def test_singleton_inheritance_isolation():
         """
 
         def __init__(self, value="child"):
+            """
+            Initialize the child singleton class with a specified value, defaulting to "child".
+            """
             super().__init__(value)
 
     try:
@@ -366,7 +399,7 @@ def test_singleton_inheritance_isolation():
 
 def test_singleton_with_exception_in_init():
     """
-    Test singleton behavior when __init__ raises an exception.
+    Tests that if a singleton's `__init__` raises an exception, the instance is not cached, allowing subsequent successful initialization and ensuring later instantiations return the same instance.
     """
 
     class ExceptionSingleton(metaclass=Singleton):
@@ -375,6 +408,12 @@ def test_singleton_with_exception_in_init():
         """
 
         def __init__(self, should_fail=False):
+            """
+            Initialize the singleton instance, optionally raising an exception to simulate initialization failure.
+            
+            Parameters:
+                should_fail (bool): If True, raises a ValueError to simulate a failed initialization.
+            """
             if should_fail:
                 raise ValueError("Initialization failed")
             self.value = "success"
@@ -402,7 +441,7 @@ def test_singleton_with_exception_in_init():
 
 def test_singleton_with_kwargs():
     """
-    Test singleton with keyword arguments.
+    Verifies that a singleton class initialized with keyword arguments only uses the arguments from the first instantiation, and subsequent instantiations return the same instance with the original values.
     """
 
     class KwargsSingleton(metaclass=Singleton):
@@ -411,6 +450,14 @@ def test_singleton_with_kwargs():
         """
 
         def __init__(self, name="default", age=0, **kwargs):
+            """
+            Initialize the singleton instance with a name, age, and any additional keyword arguments.
+            
+            Parameters:
+                name (str): The name to assign to the instance. Defaults to "default".
+                age (int): The age to assign to the instance. Defaults to 0.
+                **kwargs: Additional attributes to store in the instance.
+            """
             self.name = name
             self.age = age
             self.extra = kwargs
@@ -434,7 +481,9 @@ def test_singleton_with_kwargs():
 
 def test_singleton_stress_test_rapid_creation():
     """
-    Stress test with rapid singleton creation and clearing.
+    Performs a stress test by rapidly creating and clearing a singleton instance in a loop.
+    
+    This test verifies that the singleton implementation maintains correct instance value retention and allows proper recreation after clearing, even under repeated rapid operations.
     """
 
     class StressSingleton(metaclass=Singleton):
@@ -443,6 +492,12 @@ def test_singleton_stress_test_rapid_creation():
         """
 
         def __init__(self, value="stress"):
+            """
+            Initialize the singleton instance with a value and record its creation time.
+            
+            Parameters:
+                value (str): The value to assign to the instance. Defaults to "stress".
+            """
             self.value = value
             self.creation_time = time.time()
 
@@ -473,7 +528,7 @@ def test_singleton_stress_test_rapid_creation():
 
 def test_singleton_with_property_and_methods():
     """
-    Test singleton with properties and methods.
+    Tests that a singleton class with properties, setters, and methods maintains consistent state and behavior across multiple instantiations, verifying property persistence and method call effects.
     """
 
     class ComplexSingleton(metaclass=Singleton):
@@ -482,23 +537,38 @@ def test_singleton_with_property_and_methods():
         """
 
         def __init__(self, initial_value=0):
+            """
+            Initialize the singleton instance with an initial value and reset the call count.
+            
+            Parameters:
+            	initial_value (int, optional): The starting value for the instance. Defaults to 0.
+            """
             self._value = initial_value
             self._call_count = 0
 
         @property
         def value(self):
             """
-            Property to get the value of the singleton.
+            Returns the value stored in the singleton instance.
             """
             return self._value
 
         @value.setter
         def value(self, new_value):
+            """
+            Set the value of the singleton instance.
+            
+            Parameters:
+            	new_value: The new value to assign to the instance.
+            """
             self._value = new_value
 
         def increment(self):
             """
-            Increment the call count.
+            Increments and returns the current call count.
+            
+            Returns:
+                int: The updated call count after incrementing.
             """
             self._call_count += 1
             return self._call_count
@@ -528,14 +598,18 @@ def test_singleton_with_property_and_methods():
 
 def test_singleton_instances_dict_thread_safety():
     """
-    Test that the _instances dictionary itself is thread-safe.
+    Verifies that the internal singleton instances dictionary remains thread-safe when multiple threads concurrently create and clear singleton instances.
+    
+    This test launches multiple threads, each creating and clearing a singleton instance, and asserts that no exceptions occur and all threads complete their operations successfully.
     """
     results = {}
     exceptions = []
 
     def create_and_clear_singleton(thread_id: int):
         """
-        Create singleton, do operations, then clear it.
+        Creates a singleton instance in a thread, stores it, introduces a brief delay, and then clears the instance.
+        
+        Intended for use in multithreaded tests to verify thread safety of singleton creation and clearing. Any exceptions encountered are recorded with the thread ID.
         """
         try:
 
@@ -545,6 +619,12 @@ def test_singleton_instances_dict_thread_safety():
                 """
 
                 def __init__(self, tid):
+                    """
+                    Initialize the singleton instance with the given thread identifier.
+                    
+                    Parameters:
+                        tid: The thread identifier to associate with this instance.
+                    """
                     self.thread_id = tid
 
             # Create instance

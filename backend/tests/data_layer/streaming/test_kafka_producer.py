@@ -44,8 +44,7 @@ TEST_DATA = "test message"
 @pytest.fixture
 def mock_logger():
     """
-    Mock logger fixture for testing log output. Provides a mock logger to verify logging
-    behavior throughout the test suite.
+    Pytest fixture that provides a mock logger for verifying logging behavior in tests.
     """
     with patch("app.data_layer.streaming.producers.kafka_producer.logger") as mock:
         yield mock
@@ -53,7 +52,10 @@ def mock_logger():
 
 def _create_mock_confluent_producer():
     """
-    Helper function to create consistent mock Confluent Kafka producer.
+    Create a MagicMock instance simulating a Confluent Kafka producer with mocked methods for produce, poll, flush, and length.
+    
+    Returns:
+        MagicMock: A mock object emulating the Confluent Kafka producer interface for testing purposes.
     """
     mock_producer = MagicMock()
     mock_producer.produce = MagicMock()
@@ -66,8 +68,10 @@ def _create_mock_confluent_producer():
 @pytest.fixture(autouse=True)
 def patch_confluent_producer():
     """
-    Auto-use fixture to patch `ConfluentProducer` across all tests. Ensures consistent mocking
-    of the underlying Kafka producer throughout the test suite.
+    Auto-used pytest fixture that patches the `ConfluentProducer` class with a mock instance for all tests.
+    
+    Yields:
+        dict: Contains the patched class and its mock instance for use in tests.
     """
     with patch(
         "app.data_layer.streaming.producers.kafka_producer.ConfluentProducer"
@@ -79,7 +83,14 @@ def patch_confluent_producer():
 
 def _create_mock_message(topic=KAFKA_TOPIC, partition=0):
     """
-    Helper function to create mock Kafka message.
+    Create a mock Kafka Message object with specified topic and partition values.
+    
+    Parameters:
+        topic (str): The topic name to assign to the mock message.
+        partition (int): The partition number to assign to the mock message.
+    
+    Returns:
+        MagicMock: A mock object simulating a Kafka Message with the given topic and partition.
     """
     mock_msg = MagicMock(spec=Message)
     mock_msg.topic.return_value = topic
@@ -90,7 +101,10 @@ def _create_mock_message(topic=KAFKA_TOPIC, partition=0):
 @pytest.fixture
 def sample_kafka_config():
     """
-    Sample Kafka configuration for testing.
+    Return a sample Kafka configuration dictionary for use in tests.
+    
+    Returns:
+        dict: A dictionary containing example Kafka producer configuration options.
     """
     return {
         "compression.type": "snappy",
@@ -102,7 +116,10 @@ def sample_kafka_config():
 @pytest.fixture
 def test_kafka_producer_config():
     """
-    Test configuration for `KafkaProducer` initialization.
+    Provides a sample configuration dictionary for initializing a `KafkaProducer` in tests.
+    
+    Returns:
+        dict: A dictionary containing Kafka server address, topic, and additional producer configuration.
     """
     return {
         "kafka_server": "KAFKA_SERVER",
@@ -114,8 +131,10 @@ def test_kafka_producer_config():
 @pytest.fixture
 def basic_kafka_producer(test_kafka_producer_config):
     """
-    Fixture that creates a basic `KafkaProducer` for method-level testing. Used for tests that
-    focus on individual methods rather than complex integration scenarios.
+    Pytest fixture that provides a basic `KafkaProducer` instance for method-level tests.
+    
+    Yields:
+        KafkaProducer: An instance initialized with the provided test configuration.
     """
     producer = KafkaProducer(
         kafka_server=test_kafka_producer_config["kafka_server"],
@@ -128,8 +147,9 @@ def basic_kafka_producer(test_kafka_producer_config):
 @pytest.fixture
 def kafka_producer_with_mocks():
     """
-    Fixture that creates a `KafkaProducer` with all external dependencies mocked. Provides a fully
-    isolated producer instance for comprehensive testing of all methods and error scenarios.
+    Pytest fixture that yields a `KafkaProducer` instance with all external dependencies mocked.
+    
+    Provides an isolated producer and its associated mocks for testing functionality and error handling without requiring a real Kafka environment.
     """
     with patch(
         "app.data_layer.streaming.producers.kafka_producer.ConfluentProducer"
@@ -151,7 +171,7 @@ def kafka_producer_with_mocks():
 
 def validate_kafka_producer_instance(producer):
     """
-    Validate the properties and state of a KafkaProducer instance.
+    Asserts that a KafkaProducer instance is initialized with the expected topic, zeroed delivery counters, and a mocked producer object.
     """
     assert producer.kafka_topic == KAFKA_TOPIC
     assert producer._delivery_success_count == 0
@@ -187,9 +207,9 @@ def test_kafka_producer_custom_configuration(sample_kafka_config):
 
 def test_kafka_producer_config_merging():
     """
-    Test that custom configuration properly merges with `DEFAULT_CONFIG`. Verifies that the
-    producer configuration merging logic works correctly and that both default and custom
-    values are preserved appropriately.
+    Test that custom Kafka producer configuration merges correctly with default settings.
+    
+    Verifies that both default and custom configuration values are present in the merged config passed to the underlying ConfluentProducer, and that required fields like `bootstrap.servers` are set.
     """
     custom_config = {"compression.type": "snappy", "acks": "all"}
 
@@ -235,8 +255,9 @@ def test_kafka_producer_none_config():
 
 def test_delivery_report_success(basic_kafka_producer, mock_logger):
     """
-    Test `delivery_report` method with successful delivery. Verifies that successful message
-    delivery is properly recorded and logged with appropriate debug information.
+    Test that the `delivery_report` method correctly handles a successful message delivery.
+    
+    Verifies that the success count is incremented and a debug log is emitted when a message is delivered without error.
     """
     mock_msg = _create_mock_message(KAFKA_TOPIC, 0)
 
@@ -275,8 +296,9 @@ def test_delivery_report_failure(basic_kafka_producer, mock_logger):
 
 def test_delivery_report_statistics_logging(basic_kafka_producer, mock_logger):
     """
-    Test `delivery_report` statistics logging at `1000` message intervals. Verifies that delivery
-    statistics are logged periodically when message count reaches multiples of `1000`.
+    Test that `delivery_report` logs delivery statistics every 1000 messages.
+    
+    Verifies that the statistics log is triggered only when the total number of delivered messages reaches a multiple of 1000.
     """
     mock_msg = _create_mock_message(KAFKA_TOPIC, 0)
 
@@ -295,8 +317,9 @@ def test_delivery_report_statistics_logging(basic_kafka_producer, mock_logger):
 
 def test_call_method_success(basic_kafka_producer):
     """
-    Test successful data sending via `__call__` method. Verifies that valid data is properly
-    encoded and sent to Kafka with correct topic and callback configuration.
+    Test that the `__call__` method successfully sends valid data to Kafka.
+    
+    Verifies that the data is encoded to UTF-8, sent with the correct topic and callback, and that the method returns True on success.
     """
     result = basic_kafka_producer(TEST_DATA)
 
@@ -311,8 +334,7 @@ def test_call_method_success(basic_kafka_producer):
 
 def test_call_method_empty_data(basic_kafka_producer, mock_logger):
     """
-    Test `__call__` method with empty data. Verifies that empty or `None` data is properly
-    handled without attempting to send to Kafka.
+    Test that the `__call__` method returns False and logs a warning when given empty or None data, ensuring no message is sent to Kafka.
     """
     # Test with empty string
     result = basic_kafka_producer("")
@@ -329,9 +351,9 @@ def test_call_method_empty_data(basic_kafka_producer, mock_logger):
 
 def test_call_method_large_queue_flushing(basic_kafka_producer, mock_logger):
     """
-    Test `__call__` method with large producer queue triggering flush. Verifies that when
-    the producer queue grows large (`>10000` messages), automatic flushing is triggered to
-    prevent memory issues.
+    Test that the `__call__` method triggers a flush when the producer queue exceeds 10,000 messages.
+    
+    Verifies that a flush is performed with the correct timeout and appropriate logging occurs when the internal queue size is large.
     """
     # Mock poll to return large number of messages
     basic_kafka_producer.kafka_producer.poll.return_value = 15000
@@ -355,8 +377,9 @@ def test_call_method_large_queue_flushing(basic_kafka_producer, mock_logger):
 
 def test_call_method_buffer_error(basic_kafka_producer, mock_logger):
     """
-    Test `__call__` method handling `BufferError`. Verifies that `BufferError` (queue full)
-    is properly handled with automatic flush attempt and appropriate logging.
+    Test that the `__call__` method of `KafkaProducer` handles `BufferError` by flushing the queue and logging appropriately.
+    
+    Simulates a full producer queue causing a `BufferError`, verifies that a flush is attempted with the correct timeout, and checks that relevant warning and info logs are emitted.
     """
     # Mock produce to raise BufferError
     basic_kafka_producer.kafka_producer.produce.side_effect = BufferError("Queue full")
@@ -384,8 +407,7 @@ def test_call_method_buffer_error(basic_kafka_producer, mock_logger):
 
 def test_call_method_general_exception(basic_kafka_producer, mock_logger):
     """
-    Test `__call__` method handling general exceptions. Verifies that unexpected exceptions
-    during produce are properly caught and logged without crashing the application.
+    Test that the `__call__` method catches and logs general exceptions raised during message production, returning False without crashing.
     """
     # Mock produce to raise general exception
     basic_kafka_producer.kafka_producer.produce.side_effect = Exception(
@@ -404,8 +426,9 @@ def test_call_method_general_exception(basic_kafka_producer, mock_logger):
 
 def test_close_method_success(basic_kafka_producer, mock_logger):
     """
-    Test successful `close` method execution. Verifies that the producer flushes properly on
-    close and logs final statistics when messages have been processed.
+    Test that the `close` method flushes the producer and logs final delivery statistics on success.
+    
+    Verifies that the producer's flush is called with the correct timeout and that informational logs are emitted for both successful flush and final statistics when messages have been processed.
     """
     # Set up some delivery statistics
     basic_kafka_producer._delivery_success_count = 800
@@ -431,8 +454,7 @@ def test_close_method_success(basic_kafka_producer, mock_logger):
 
 def test_close_method_with_remaining_messages(basic_kafka_producer, mock_logger):
     """
-    Test `close` method when some messages remain after flush. Verifies that warning is logged
-    when not all messages can be flushed during producer shutdown.
+    Test that the `close` method logs a warning if messages remain after flushing during shutdown.
     """
     basic_kafka_producer.kafka_producer.flush.return_value = 5
     basic_kafka_producer.close()
@@ -444,8 +466,9 @@ def test_close_method_with_remaining_messages(basic_kafka_producer, mock_logger)
 
 def test_close_method_no_statistics(basic_kafka_producer, mock_logger):
     """
-    Test `close` method when no messages have been processed. Verifies that statistics are not
-    logged when no messages have been sent through the producer.
+    Test that the `close` method does not log statistics when no messages have been processed.
+    
+    Verifies that only the flush success message is logged if the producer has not sent any messages.
     """
     basic_kafka_producer.kafka_producer.flush.return_value = 0
     basic_kafka_producer.close()
@@ -456,8 +479,7 @@ def test_close_method_no_statistics(basic_kafka_producer, mock_logger):
 
 def test_close_method_flush_exception(basic_kafka_producer, mock_logger):
     """
-    Test `close` method handling flush exceptions. Verifies that exceptions during flush are
-    properly caught and logged without crashing the application.
+    Test that the `close` method logs an error and handles exceptions raised during the flush operation without crashing.
     """
     basic_kafka_producer.kafka_producer.flush.side_effect = Exception("Flush error")
     basic_kafka_producer.close()
@@ -491,8 +513,9 @@ def test_close_method_no_producer(basic_kafka_producer, mock_logger):
 
 def test_multiple_buffer_errors(basic_kafka_producer):
     """
-    Test handling of consecutive `BufferError` exceptions. Verifies that multiple buffer errors
-    are handled gracefully and that flush attempts continue to be made.
+    Test that consecutive BufferError exceptions during message sending are handled by repeated flush attempts.
+    
+    Verifies that when the producer's queue is full and multiple BufferErrors occur, each send attempt triggers a flush and returns False.
     """
     basic_kafka_producer.kafka_producer.produce.side_effect = BufferError("Queue full")
     basic_kafka_producer.kafka_producer.__len__.return_value = 100000
@@ -513,8 +536,9 @@ def test_multiple_buffer_errors(basic_kafka_producer):
 
 def test_producer_statistics_mixed_success_failure(basic_kafka_producer, mock_logger):
     """
-    Test statistics calculation with mixed success and failure. Verifies that statistics are
-    correctly calculated when there are both successful and failed message deliveries.
+    Test that KafkaProducer logs correct statistics when both successful and failed deliveries occur.
+    
+    Simulates a scenario with a mix of successful and failed message deliveries to ensure that the producer logs the correct success rate and message counts when the total reaches a statistics reporting threshold.
     """
     mock_msg = _create_mock_message(KAFKA_TOPIC, 0)
     kafka_error = KafkaError(KafkaError._MSG_TIMED_OUT)
@@ -541,8 +565,9 @@ def test_producer_statistics_mixed_success_failure(basic_kafka_producer, mock_lo
 
 def test_large_message_handling(basic_kafka_producer):
     """
-    Test handling of large messages. Verifies that large messages are properly encoded
-    and sent without issues in the producer logic.
+    Test that the KafkaProducer correctly encodes and sends large messages without errors.
+    
+    Verifies that a message of approximately 1MB is accepted, encoded to UTF-8, and passed to the underlying producer's `produce` method as expected.
     """
     # Create a large message (1MB)
     large_data = "x" * (1024 * 1024)
@@ -576,8 +601,7 @@ def test_unicode_message_handling(basic_kafka_producer):
 
 def test_json_message_handling(basic_kafka_producer):
     """
-    Test handling of JSON-serialized messages. Verifies that complex data structures serialized
-    as JSON are properly handled by the producer.
+    Test that the producer correctly handles and sends JSON-serialized message payloads.
     """
     data_dict = {
         "user_id": 12345,
@@ -599,8 +623,9 @@ def test_json_message_handling(basic_kafka_producer):
 
 def test_queue_management_edge_cases(basic_kafka_producer):
     """
-    Test edge cases in queue management logic. Verifies that queue management behaves
-    correctly at boundary conditions (exactly `10000` messages, flush failures, etc.).
+    Test queue management behavior at boundary values for the internal producer queue.
+    
+    Verifies that flushing is not triggered when the queue size is exactly at the threshold, but is triggered when the queue size exceeds the threshold. Also checks correct handling of flush return values and method calls.
     """
     # Test exactly at threshold (should not trigger flush)
     basic_kafka_producer.kafka_producer.poll.return_value = 10000
@@ -627,8 +652,7 @@ def test_queue_management_edge_cases(basic_kafka_producer):
 
 def test_from_cfg_success():
     """
-    Test successful creation from configuration. Verifies that `from_cfg` class method correctly
-    creates a `KafkaProducer` instance from a valid configuration object.
+    Test that the `from_cfg` class method creates a `KafkaProducer` instance from a valid configuration object.
     """
     cfg = DictConfig(
         {
@@ -647,8 +671,7 @@ def test_from_cfg_success():
 
 def test_from_cfg_missing_kafka_server(mock_logger):
     """
-    Test `from_cfg` with missing `kafka_server`. Verifies that missing `kafka_server`
-    configuration results in `None` return value and appropriate error logging.
+    Test that `KafkaProducer.from_cfg` returns None and logs an error when `kafka_server` is missing from the configuration.
     """
     cfg = DictConfig(
         {
@@ -664,8 +687,7 @@ def test_from_cfg_missing_kafka_server(mock_logger):
 
 def test_from_cfg_missing_kafka_topic(mock_logger):
     """
-    Test `from_cfg` with missing `kafka_topic`. Verifies that missing `kafka_topic` configuration
-    results in `None` return value and appropriate error logging.
+    Test that `KafkaProducer.from_cfg` returns None and logs an error when `kafka_topic` is missing from the configuration.
     """
     cfg = DictConfig(
         {
@@ -681,8 +703,7 @@ def test_from_cfg_missing_kafka_topic(mock_logger):
 
 def test_from_cfg_invalid_configuration_format(mock_logger):
     """
-    Test `from_cfg` with invalid configuration format. Verifies that invalid configuration types
-    are handled gracefully with appropriate error logging.
+    Test that `KafkaProducer.from_cfg` returns None and logs an error when given an invalid configuration format.
     """
     # Test with non-dict configuration
     cfg = "invalid_config"
@@ -700,8 +721,9 @@ def test_from_cfg_invalid_configuration_format(mock_logger):
 
 def test_from_cfg_with_producer_config():
     """
-    Test `from_cfg` with additional producer configuration. Verifies that producer-specific
-    configuration is properly extracted and passed to the `KafkaProducer` constructor.
+    Test that `KafkaProducer.from_cfg` correctly applies additional producer configuration from the config object.
+    
+    Verifies that custom producer settings in the `producer_config` section are extracted and used when creating the `KafkaProducer` instance.
     """
     cfg = DictConfig(
         {
@@ -724,8 +746,9 @@ def test_from_cfg_with_producer_config():
 
 def test_from_cfg_without_producer_config():
     """
-    Test `from_cfg` without `producer_config`. Verifies that missing `producer_config` doesn't
-    cause errors and defaults to empty configuration.
+    Test that `KafkaProducer.from_cfg` works correctly when `producer_config` is not provided.
+    
+    Verifies that the absence of `producer_config` in the configuration does not cause errors and results in a producer instance with default settings.
     """
     cfg = DictConfig(
         {
@@ -743,8 +766,9 @@ def test_from_cfg_without_producer_config():
 
 def test_from_cfg_exception_handling(mock_logger):
     """
-    Test `from_cfg` exception handling. Verifies that unexpected exceptions during configuration
-    processing are properly caught and logged.
+    Test that `KafkaProducer.from_cfg` handles and logs unexpected exceptions during configuration processing.
+    
+    Verifies that if an exception occurs while processing the configuration, the method returns `None` and logs the error.
     """
     cfg = DictConfig(
         {
@@ -773,8 +797,7 @@ def test_from_cfg_exception_handling(mock_logger):
 
 def test_delivery_statistics_accuracy(basic_kafka_producer):
     """
-    Test accuracy of delivery statistics tracking. Verifies that success and failure counts
-    are accurately maintained across multiple delivery report calls.
+    Verify that the KafkaProducer correctly tracks the number of successful and failed deliveries across multiple delivery report invocations.
     """
     mock_msg = _create_mock_message(KAFKA_TOPIC, 0)
     kafka_error = KafkaError(KafkaError._MSG_TIMED_OUT)
@@ -793,8 +816,7 @@ def test_delivery_statistics_accuracy(basic_kafka_producer):
 
 def test_queue_polling_behavior(basic_kafka_producer):
     """
-    Test producer queue polling behavior. Verifies that `poll(0)` is called on every send
-    operation to trigger delivery callbacks.
+    Verifies that the producer's `poll(0)` method is called on every message send to ensure delivery callbacks are triggered.
     """
     basic_kafka_producer.kafka_producer.poll.return_value = 100
 
@@ -812,8 +834,7 @@ def test_queue_polling_behavior(basic_kafka_producer):
 
 def test_statistics_logging_intervals(basic_kafka_producer, mock_logger):
     """
-    Test that statistics are logged only at correct intervals. Verifies that statistics
-    logging occurs exactly at multiples of `1000` messages and not at other counts.
+    Verify that delivery statistics are logged only at exact multiples of 1000 successful messages, and not at other message counts.
     """
     mock_msg = _create_mock_message(KAFKA_TOPIC, 0)
 
@@ -839,8 +860,9 @@ def test_statistics_logging_intervals(basic_kafka_producer, mock_logger):
 
 def test_comprehensive_integration_scenario(kafka_producer_with_mocks, mock_logger):
     """
-    Test comprehensive integration scenario. Verifies that all components work together
-    correctly in a realistic usage scenario with multiple operations.
+    Simulates an end-to-end integration scenario for KafkaProducer, verifying correct operation across message sending, delivery reporting, and resource cleanup.
+    
+    This test ensures that messages are sent, delivery reports are processed for both success and failure, and final statistics are logged as expected in a realistic usage pattern.
     """
     producer_data = kafka_producer_with_mocks
     producer = producer_data["producer"]
@@ -889,8 +911,7 @@ def test_comprehensive_integration_scenario(kafka_producer_with_mocks, mock_logg
 
 def test_delivery_report_with_invalid_message(basic_kafka_producer):
     """
-    Test `delivery_report` with invalid message object. Verifies that `delivery_report`
-    handles edge cases where message object might not have expected methods.
+    Tests that `delivery_report` handles message objects lacking expected methods without crashing, incrementing the failure count as appropriate.
     """
     # Create a mock message that doesn't implement expected methods properly
     mock_msg = MagicMock()
@@ -911,8 +932,7 @@ def test_delivery_report_with_invalid_message(basic_kafka_producer):
 
 def test_very_high_message_throughput_statistics(basic_kafka_producer, mock_logger):
     """
-    Test statistics logging with very high message throughput. Verifies that statistics are
-    logged correctly even when processing many thousands of messages.
+    Verifies that the KafkaProducer logs correct delivery statistics when processing a very high number of messages, ensuring accurate reporting at large throughput volumes.
     """
     mock_msg = _create_mock_message(KAFKA_TOPIC, 0)
 
@@ -934,8 +954,9 @@ def test_very_high_message_throughput_statistics(basic_kafka_producer, mock_logg
 
 def test_zero_success_rate_statistics(basic_kafka_producer, mock_logger):
     """
-    Test statistics logging when all messages fail. Verifies that `0%` success rate is
-    correctly calculated and logged.
+    Test that the KafkaProducer logs a 0% success rate when all message deliveries fail.
+    
+    Simulates 1000 failed deliveries and verifies that the statistics log reflects zero successful messages out of 1000, with a 0.0% success rate.
     """
     mock_msg = _create_mock_message(KAFKA_TOPIC, 0)
     kafka_error = KafkaError(KafkaError.NETWORK_EXCEPTION)
@@ -957,8 +978,7 @@ def test_zero_success_rate_statistics(basic_kafka_producer, mock_logger):
 
 def test_producer_config_with_all_defaults():
     """
-    Test that all `DEFAULT_CONFIG` values are properly applied. Verifies that when no custom
-    config is provided, all default configuration values are correctly set in the producer.
+    Verify that the KafkaProducer applies all default configuration values when no custom config is provided.
     """
     with patch(
         "app.data_layer.streaming.producers.kafka_producer.ConfluentProducer"
@@ -978,8 +998,9 @@ def test_producer_config_with_all_defaults():
 
 def test_buffer_error_with_zero_remaining_messages(basic_kafka_producer, mock_logger):
     """
-    Test `BufferError` handling when flush completely empties the queue. Verifies that when flush
-    returns `0` (all messages flushed), the logging reflects this correctly.
+    Test that a BufferError triggers a flush and logs zero remaining messages when the queue is fully emptied.
+    
+    Verifies that when a BufferError occurs during message production and the subsequent flush empties the queue (returns 0), the correct log message is emitted indicating no remaining messages.
     """
     basic_kafka_producer.kafka_producer.produce.side_effect = BufferError("Queue full")
     basic_kafka_producer.kafka_producer.__len__.return_value = 50000
@@ -997,8 +1018,9 @@ def test_buffer_error_with_zero_remaining_messages(basic_kafka_producer, mock_lo
 
 def test_message_encoding_edge_cases(basic_kafka_producer):
     """
-    Test message encoding with various edge cases. Verifies that different types of string
-    content are properly encoded to `UTF-8` bytes.
+    Tests that the KafkaProducer correctly encodes various edge-case string messages to UTF-8 bytes before sending.
+    
+    Verifies proper handling of whitespace, control characters, emojis, mixed Unicode content, and long strings.
     """
     test_cases = [
         "",  # Empty string (though this is handled separately)
@@ -1025,8 +1047,7 @@ def test_message_encoding_edge_cases(basic_kafka_producer):
 
 def test_close_with_partial_flush_timeout(basic_kafka_producer, mock_logger):
     """
-    Test `close` method when flush times out with messages remaining. Verifies behavior when
-    the flush operation doesn't complete within the timeout period.
+    Test that the `close` method logs a warning and final statistics when flush times out with messages remaining in the queue.
     """
     # Simulate flush timeout with many messages remaining
     basic_kafka_producer.kafka_producer.flush.return_value = 5000
@@ -1070,8 +1091,7 @@ def test_producer_multiple_close_calls(basic_kafka_producer, mock_logger):
 
 def test_from_cfg_with_empty_producer_config():
     """
-    Test `from_cfg` with explicitly empty `producer_config`. Verifies that an empty
-    `producer_config` dict doesn't cause issues and falls back to default configuration.
+    Test that `from_cfg` correctly handles an explicitly empty `producer_config` by falling back to default configuration without error.
     """
     cfg = DictConfig(
         {
@@ -1092,8 +1112,9 @@ def test_queue_management_with_exact_threshold_values(
     basic_kafka_producer, mock_logger
 ):
     """
-    Test queue management behavior at exact threshold boundaries. Verifies that queue
-    management logic works correctly at boundary values (exactly `10000`, `10001`, etc.).
+    Test that the KafkaProducer flushes its queue only when the internal queue size exceeds the threshold.
+    
+    Verifies that no flush occurs when the queue size is at or below 10,000, and that a flush is triggered when the queue size exceeds this threshold.
     """
     test_cases = [
         (9999, False),  # Just under threshold - no flush
@@ -1124,8 +1145,7 @@ def test_queue_management_with_exact_threshold_values(
 
 def test_comprehensive_error_scenario_chain(basic_kafka_producer, mock_logger):
     """
-    Test a comprehensive chain of error scenarios. Verifies that the producer can handle
-    multiple different types of errors in sequence without breaking.
+    Simulates a sequence of error scenarios—including buffer errors, general exceptions, and successful sends—to verify that the KafkaProducer handles each case gracefully and logs appropriate messages.
     """
 
     # First, test buffer error

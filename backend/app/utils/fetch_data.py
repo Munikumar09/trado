@@ -15,25 +15,18 @@ logger = get_logger(Path(__file__).name)
 
 def fetch_data(url: str, max_tries: int = 10) -> Any:
     """
-    Fetch the data from given nse url and decode the response as a key value paris.
-
+    Fetches JSON data from a specified NSE URL, retrying the request up to a given number of times.
+    
     Parameters:
-    -----------
-    url: ``str``
-        Url from nse to fetch the data
-    max_tries: ``int`` (defaults = 1000)
-        Maximum number of times the request has to send to get response. Requests
-        are made until either get the status code `200` or exceed max_tries
-
-    Raises:
-    -------
-    ``HTTPException``
-        If not get response even after max_tries
-
+        url (str): The target NSE URL to fetch data from.
+        max_tries (int, optional): Maximum number of request attempts. Must be greater than 0.
+    
     Returns:
-    --------
-    ``Any``
-        Json loaded response from the api.
+        Any: The parsed JSON response from the API.
+    
+    Raises:
+        ValueError: If max_tries is less than 1.
+        HTTPException: If the resource is not found (404) or if the service is unavailable after all retries (503).
     """
     if max_tries < 1:
         raise ValueError("max_tries should be greater than 0")
@@ -67,25 +60,9 @@ def fetch_data(url: str, max_tries: int = 10) -> Any:
 
 def get_env_var(name: str, default: str | None = None) -> str:
     """
-    Get the required environment variable from the system.
-
-    Parameters:
-    -----------
-    name: ``str``
-        Name of the environment variable to fetch
-    default: ``str`` (default = None)
-        Default value to return if the environment variable is not found.
-        If not provided, a ValueError will be raised if the variable is missing.
-
-    Raises:
-    -------
-    ``ValueError``
-        If the required environment variable is not found
-
-    Returns:
-    --------
-    ``str``
-        Value of the environment variable
+    Retrieve the value of an environment variable, returning a default if specified.
+    
+    If the environment variable is not set and no default is provided, raises a ValueError.
     """
     value = os.environ.get(name, default)
 

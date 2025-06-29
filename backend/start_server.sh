@@ -16,7 +16,7 @@ sleep 10
 python main.py &
 SERVER_PID=$!
 
-# 4) cleanup on exit
+# cleanup terminates the WebSocket client and server processes if they are running.
 cleanup() {
 	kill $WS_PID $SERVER_PID 2>/dev/null || true
 }

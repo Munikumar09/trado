@@ -44,7 +44,22 @@ def create_instrument_data(
     expiry_date: str = "",
 ) -> Dict[str, Any]:
     """
-    Create standardized instrument data dictionary.
+    Generate a standardized dictionary representing an instrument for testing purposes.
+    
+    Parameters:
+        token (str or int): Unique identifier for the instrument.
+        symbol (str): Trading symbol of the instrument.
+        name (str, optional): Name of the instrument. Defaults to "Test Company".
+        instrument_type (str, optional): Type of the instrument (e.g., "EQ"). Defaults to "EQ".
+        exchange_id (int, optional): Exchange identifier. Defaults to NSE if not provided.
+        data_provider_id (int, optional): Data provider identifier. Defaults to SMARTAPI if not provided.
+        tick_size (float, optional): Minimum price movement. Defaults to 5.0.
+        lot_size (int, optional): Number of units per lot. Defaults to 1.
+        strike_price (float, optional): Strike price for derivatives. Defaults to -1.0.
+        expiry_date (str, optional): Expiry date for derivatives. Defaults to empty string.
+    
+    Returns:
+        Dict[str, Any]: Dictionary containing instrument attributes suitable for test data creation.
     """
     return {
         "token": str(token),
@@ -70,7 +85,13 @@ def create_instrument_price_data(
     last_traded_timestamp: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """
-    Create standardized instrument price data dictionary.
+    Generate a standardized dictionary representing instrument price data for testing.
+    
+    Parameters:
+        symbol (str): The symbol of the instrument.
+    
+    Returns:
+        Dict[str, Any]: A dictionary containing instrument price attributes, with default values for missing timestamps and optional fields.
     """
     if retrieval_timestamp is None:
         retrieval_timestamp = datetime(2023, 1, 1, 10, 0, 0)
@@ -96,7 +117,15 @@ def create_bulk_instrument_data(
     prefix: str, count: int, start_index: int = 0
 ) -> List[Dict[str, Any]]:
     """
-    Create a list of instrument data for bulk operations.
+    Generate a list of instrument data dictionaries for bulk testing or insertion.
+    
+    Parameters:
+        prefix (str): String prefix used for token, symbol, and name fields.
+        count (int): Number of instrument data dictionaries to generate.
+        start_index (int): Starting index for numbering the generated instruments.
+    
+    Returns:
+        List[Dict[str, Any]]: List of instrument data dictionaries with unique tokens and symbols.
     """
     return [
         create_instrument_data(
@@ -112,7 +141,15 @@ def measure_performance(
     operation_func: Callable[..., Any], *args: Any, **kwargs: Any
 ) -> Tuple[Any, float]:
     """
-    Measure the performance of an operation and return result and duration.
+    Executes a given operation and returns its result along with the time taken in seconds.
+    
+    Parameters:
+        operation_func (Callable): The function to execute.
+        *args: Positional arguments to pass to the operation.
+        **kwargs: Keyword arguments to pass to the operation.
+    
+    Returns:
+        Tuple[Any, float]: A tuple containing the result of the operation and the elapsed time in seconds.
     """
     start_time = time.time()
     result = operation_func(*args, **kwargs)
@@ -128,7 +165,14 @@ def verify_record_count(
     filter_condition: Optional[Any] = None,
 ) -> List[SQLModel]:
     """
-    Verify the number of records in the database matches expected count.
+    Checks that the number of records for a given model in the database matches the expected count, optionally applying a filter condition.
+    
+    Parameters:
+        expected_count (int): The number of records expected to be found.
+        filter_condition (Any, optional): SQLAlchemy filter condition to apply to the query.
+    
+    Returns:
+        List[SQLModel]: List of records matching the query.
     """
     query = select(model)
     if filter_condition is not None:
@@ -143,7 +187,10 @@ def verify_record_exists(
     session: Session, model: Type[SQLModel], **conditions: Any
 ) -> SQLModel:
     """
-    Verify that a record exists with the given conditions.
+    Checks for the existence of a record in the database matching all specified conditions.
+    
+    Returns:
+        The first record found that matches all provided conditions.
     """
     results = get_data_by_all_conditions(model, session=session, **conditions)
     assert len(results) > 0
@@ -153,7 +200,11 @@ def verify_record_exists(
 
 def verify_record_data(record: SQLModel, expected_data: Dict[str, Any]) -> None:
     """
-    Verify that a record contains the expected data.
+    Asserts that the specified record's attributes match the expected key-value pairs.
+    
+    Parameters:
+        record (SQLModel): The database record to verify.
+        expected_data (dict): Dictionary of attribute names and their expected values.
     """
     for key, expected_value in expected_data.items():
         actual_value = getattr(record, key)
@@ -169,7 +220,9 @@ def validate_pre_upsert_data(
     upsert_data: List[Dict[str, Any]], model: Type[SQLModel], session: Session
 ) -> None:
     """
-    Validate data before upsert operation.
+    Validates that existing records differ from new data before performing an upsert.
+    
+    For each item in `upsert_data`, checks if a record with the same token exists in the database and asserts that its data does not match the new data.
     """
     for data in upsert_data:
         prev_data = session.exec(
@@ -183,7 +236,9 @@ def validate_post_upset_data(
     upsert_data: List[Dict[str, Any]], model: Type[SQLModel], session: Session
 ) -> None:
     """
-    Validate data after upsert operation.
+    Validates that each record in the database matches the corresponding data after an upsert operation.
+    
+    Checks that for each data dictionary in `upsert_data`, a record exists in the database with the same `symbol` and that its attributes exactly match the provided data.
     """
     for data in upsert_data:
         result = session.exec(
@@ -197,7 +252,14 @@ def validate_pre_insert_or_ignore_data(
     data_to_insert: List[Dict[str, Any]], model: Type[SQLModel], session: Session
 ) -> List[Optional[SQLModel]]:
     """
-    Validate data before insert or ignore operation.
+    Checks for existing records matching the symbol before an insert-or-ignore operation and asserts that any found record differs from the new data.
+    
+    Parameters:
+        data_to_insert (List[Dict[str, Any]]): List of data dictionaries to be inserted.
+        model (Type[SQLModel]): The SQLModel class representing the database table.
+    
+    Returns:
+        List[Optional[SQLModel]]: List of existing records matching each symbol, or None if no record exists.
     """
     previous_data = []
     for data in data_to_insert:
@@ -217,7 +279,11 @@ def validate_post_insert_or_ignore_data(
     previous_data: List[Optional[SQLModel]],
 ) -> None:
     """
-    Validate data after insert or ignore operation.
+    Validates that records after an insert-or-ignore operation are unchanged if they previously existed, or match the inserted data if newly created.
+    
+    Parameters:
+        data_to_insert (List[Dict[str, Any]]): List of data dictionaries attempted for insertion.
+        previous_data (List[Optional[SQLModel]]): List of existing records prior to insertion, or None if not present.
     """
     for idx, data in enumerate(data_to_insert):
         result = session.exec(
@@ -248,7 +314,13 @@ def test_validate_model_attributes(
     expected_message: Optional[str],
 ) -> None:
     """
-    Test the validate_model_attributes function.
+    Tests that `validate_model_attributes` raises the expected exception and message for invalid attributes, or passes for valid attributes.
+    
+    Parameters:
+        model: The SQLModel class to validate against.
+        attributes: Dictionary of attributes to validate.
+        expected_exception: Exception type expected to be raised, or None if no exception is expected.
+        expected_message: Expected exception message if an exception is raised.
     """
     if expected_exception:
         with pytest.raises(expected_exception) as exc_info:
@@ -273,7 +345,9 @@ def test_get_conditions_list(
     expected_conditions: List[Any],
 ) -> None:
     """
-    Test the get_conditions_list function.
+    Test that get_conditions_list returns the correct SQLAlchemy conditions for the given model and attribute dictionary.
+    
+    Asserts that each generated condition matches the expected condition using SQLAlchemy's compare method.
     """
     conditions = get_conditions_list(model, condition_attributes)
     for actual, expected in zip(conditions, expected_conditions):
@@ -301,7 +375,9 @@ def test_get_data_by_any_condition(
     num_results: int,
 ) -> None:
     """
-    Test the get_data_by_any_condition function.
+    Tests that get_data_by_any_condition returns records matching any provided attribute conditions or raises an HTTPException if no conditions are given.
+    
+    Asserts correct result count and attribute values when matches are expected, and verifies proper exception details for invalid input.
     """
     if expected_result is HTTPException:
         with pytest.raises(HTTPException) as exc_info:
@@ -345,7 +421,9 @@ def test_get_data_by_all_conditions(
     num_results: int,
 ) -> None:
     """
-    Test the get_data_by_all_conditions function.
+    Tests that get_data_by_all_conditions returns records matching all specified attributes or raises an HTTPException when no attributes are provided.
+    
+    Verifies correct filtering, result count, and error handling for various input scenarios.
     """
     if expected_result is HTTPException:
         with pytest.raises(HTTPException) as exc_info:
@@ -382,7 +460,9 @@ def test_upsert(
     expected_result: bool,
 ) -> None:
     """
-    Test the _upsert function.
+    Tests the `_upsert` function for correct insert or update behavior with the given model and data.
+    
+    Validates that an `OperationalError` is raised when `expected_result` is False; otherwise, ensures data is correctly updated or inserted before and after the operation.
     """
 
     if not expected_result:
@@ -396,7 +476,7 @@ def test_upsert(
 
 def test_upsert_with_dummy_session() -> None:
     """
-    Test the upsert function with a dummy session object.
+    Test that the upsert operation raises a ValueError when used with a dummy session simulating an unsupported database dialect.
     """
     mock_session = MagicMock()
     mock_session.bind.dialect.name = "mysql"
@@ -420,7 +500,9 @@ def test_insert_or_ignore(
     expected_result: bool,
 ) -> None:
     """
-    Test the _insert_or_ignore function.
+    Test that the `_insert_or_ignore` function correctly inserts records or raises an error for unsupported operations.
+    
+    Verifies that records are inserted only if they do not already exist, and that an `OperationalError` is raised when insertion is not supported.
     """
     if not expected_result:
         with pytest.raises(OperationalError):
@@ -453,7 +535,11 @@ def test_batch_processing(
     operation_type: str,
 ) -> None:
     """
-    Test batch processing with large datasets for both insert and upsert operations.
+    Test batch insert or upsert operations with large datasets to ensure all records are processed correctly.
+    
+    Parameters:
+        data_size (int): The number of records to generate and process in the batch.
+        operation_type (str): The type of operation to perform, either "insert" or "upsert".
     """
     # Generate test data using helper function
     data = create_bulk_instrument_data(f"BATCH_{operation_type.upper()}", data_size)
@@ -478,7 +564,7 @@ def test_batch_processing(
 
 def test_insert_or_ignore_with_dummy_session() -> None:
     """
-    Test the _insert_or_ignore function with a dummy session object.
+    Test that _insert_or_ignore raises a ValueError when used with a dummy session simulating an unsupported database dialect.
     """
     mock_session = MagicMock()
     mock_session.bind.dialect.name = "mysql"
@@ -504,7 +590,9 @@ def test_insert_data(
     expected_result: bool,
 ) -> None:
     """
-    Test the insert_data function.
+    Test the insert_data function for correct insertion or update of records.
+    
+    Validates that insert_data returns False when no data is provided, and True when records are inserted or updated as expected. Verifies data integrity before and after the operation, handling both single and multiple records, and both insert and update scenarios.
     """
     if not expected_result:
         assert (
@@ -557,7 +645,7 @@ def test_insert_data(
 
 def test_insert_data_with_dummy_session() -> None:
     """
-    Test the insert_data function with a dummy session object.
+    Test that insert_data raises a ValueError when called with a dummy session simulating an unsupported database dialect.
     """
     mock_session = MagicMock()
     mock_session.bind.dialect.name = "mysql"
@@ -570,7 +658,7 @@ def test_insert_data_with_dummy_session() -> None:
 
 def test_end_to_end_workflow(session: Session) -> None:
     """
-    Test end-to-end workflow with multiple operations.
+    Performs an end-to-end test of CRUD operations on the Instrument model, including bulk insert, querying by conditions, updating, and duplicate insertion with ignore, verifying data correctness at each step.
     """
     # Step 1: Insert initial data using helper function
     initial_instruments = create_bulk_instrument_data("E2E", 10)
@@ -634,7 +722,7 @@ def test_end_to_end_workflow(session: Session) -> None:
 
 def test_cross_model_operations(session: Session) -> None:
     """
-    Test operations across multiple models (Instrument and InstrumentPrice).
+    Tests inserting and querying related records across Instrument and InstrumentPrice models to verify cross-model data consistency.
     """
     # Insert instrument using helper function
     instrument_data = create_instrument_data(
@@ -660,7 +748,9 @@ def test_cross_model_operations(session: Session) -> None:
 @pytest.mark.performance
 def test_performance_operations(session: Session) -> None:
     """
-    Test performance with large batch insertions and upserts.
+    Evaluates the performance of batch insert, upsert, and query operations on the Instrument model with large datasets.
+    
+    This test measures execution time for inserting 10,000 records, upserting 5,000 records with updates, and querying large datasets, asserting that each operation completes within specified time limits and that data integrity is maintained.
     """
     # Test large batch insert
     insert_data_size = 10000
@@ -750,7 +840,9 @@ def test_performance_operations(session: Session) -> None:
 
 def test_stress_test_multiple_operations(session: Session) -> None:
     """
-    Stress test with multiple concurrent operations.
+    Performs a stress test by executing a sequence of 100 alternating insert, query, and update operations on the Instrument model.
+    
+    This test simulates a high-load scenario by mixing different CRUD operations in rapid succession and verifies that the minimum expected number of records exist after all operations.
     """
     operations_count = 100
 
@@ -803,7 +895,7 @@ def test_stress_test_multiple_operations(session: Session) -> None:
 
 def test_error_recovery_and_consistency(session: Session) -> None:
     """
-    Test error recovery and data consistency.
+    Tests that valid data can be inserted after initial data population, verifying error recovery and ensuring data consistency in the database.
     """
     # Insert some initial data using helper function
     initial_data = create_bulk_instrument_data("RECOVERY", 5)
@@ -834,7 +926,9 @@ def test_error_recovery_and_consistency(session: Session) -> None:
 
 def test_boundary_conditions(session: Session) -> None:
     """
-    Test boundary conditions and edge cases.
+    Test insertion and verification of records with minimum and maximum attribute values for boundary condition coverage.
+    
+    Inserts an `Instrument` record with minimal field values and another with maximal reasonable values, then verifies both records exist in the database.
     """
     # Test with minimum values using helper function
     min_data = create_instrument_data(
@@ -872,7 +966,7 @@ def test_boundary_conditions(session: Session) -> None:
 
 def test_conditions_with_special_characters(session: Session) -> None:
     """
-    Test get_conditions_list and query functions with special characters.
+    Tests that condition generation and querying functions correctly handle attribute values containing special characters.
     """
     # Insert data with special characters using helper function
     special_data = create_instrument_data(
@@ -889,7 +983,7 @@ def test_conditions_with_special_characters(session: Session) -> None:
 
 def test_database_constraint_handling(session: Session) -> None:
     """
-    Test handling of database constraints and foreign key relationships.
+    Tests that inserting an InstrumentPrice record without a corresponding Instrument fails or is ignored due to foreign key constraints, ensuring database integrity is enforced.
     """
     # Test inserting InstrumentPrice without corresponding Instrument
     # This should fail due to foreign key constraint using helper function

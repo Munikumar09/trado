@@ -48,44 +48,25 @@ class Producer(ABC, Registrable):
     @abstractmethod
     def __call__(self, data: str) -> bool:
         """
-        Send data to the streaming system.
-
-        This callable method provides a convenient interface for sending data
-        to the underlying streaming platform. Concrete implementations should
-        handle serialization, batching, and error handling as appropriate.
-
-        Parameters
-        ----------
-        data: ``str``
-            The data to send to the streaming system, typically a JSON string
-            or other serialized message format
-
-        Returns
-        -------
-        success: ``bool``
-            True if the data was successfully sent to the streaming system,
-            False if the send operation failed
-
-        Raises
-        ------
-        ``NotImplementedError``
-            If the method is not implemented by a subclass
+        Send a data message to the streaming system.
+        
+        Parameters:
+            data (str): The serialized data to send, such as a JSON string.
+        
+        Returns:
+            bool: True if the data was successfully sent; False otherwise.
+        
+        Raises:
+            NotImplementedError: If not implemented by a subclass.
         """
         raise NotImplementedError
 
     @abstractmethod
     def close(self) -> None:
         """
-        Release resources and close connections.
-
-        Properly shuts down the producer, ensuring that any buffered messages
-        are flushed and all resources (connections, threads, etc.) are properly
-        released. This method should be called when the producer is no longer needed.
-
-        Raises
-        ------
-        ``NotImplementedError``
-            If the method is not implemented by a subclass
+        Closes the producer and releases all associated resources.
+        
+        This method should be called when the producer is no longer needed to ensure that buffered messages are flushed and resources such as connections and threads are properly released.
         """
         raise NotImplementedError
 
@@ -93,26 +74,14 @@ class Producer(ABC, Registrable):
     @abstractmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["Producer"]:
         """
-        Create a producer instance from configuration.
-
-        Factory method to instantiate a concrete producer implementation
-        using parameters specified in a configuration object.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing parameters required to
-            initialize the producer, such as:
-
-        Returns
-        -------
-        ``Producer | None``
-            An initialized concrete producer instance ready to send messages,
-            or None if the producer cannot be created with the given configuration
-
-        Raises
-        ------
-        ``NotImplementedError``
-            If the method is not implemented by a subclass
+        Instantiate a concrete producer from a configuration object.
+        
+        This factory method creates and returns a producer instance using parameters provided in the configuration. Returns None if instantiation is not possible with the given configuration.
+        
+        Returns:
+            Producer or None: An initialized producer instance, or None if creation fails.
+        
+        Raises:
+            NotImplementedError: If not implemented by a subclass.
         """
         raise NotImplementedError

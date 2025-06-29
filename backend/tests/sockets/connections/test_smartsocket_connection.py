@@ -36,6 +36,12 @@ def init_data(
 
 @pytest.fixture
 def connection_cfg() -> dict:
+    """
+    Provides a default configuration dictionary for initializing a SmartSocketConnection in tests.
+    
+    Returns:
+        dict: Configuration parameters for the SmartSocketConnection, including provider, streaming, symbols, exchange type, and connection settings.
+    """
     return {
         "name": "smartsocket_connection",
         "provider": {
@@ -60,11 +66,23 @@ def connection_cfg() -> dict:
 
 @pytest.fixture(autouse=True)
 def smart_socket_mock(mocker: MockerFixture):
+    """
+    Automatically mocks the SmartSocket class used in SmartSocketConnection tests.
+    
+    Returns:
+        MagicMock: The patched SmartSocket class mock.
+    """
     return mocker.patch("app.sockets.connections.smartsocket_connection.SmartSocket")
 
 
 @pytest.fixture(autouse=True)
 def mock_producer(mocker: MockerFixture):
+    """
+    Automatically mocks the `init_from_cfg` function in the `smartsocket_connection` module for use in tests.
+    
+    Returns:
+        MagicMock: The mock object replacing `init_from_cfg`.
+    """
     return mocker.patch("app.sockets.connections.smartsocket_connection.init_from_cfg")
 
 
@@ -72,6 +90,15 @@ def mock_producer(mocker: MockerFixture):
 def connection(
     connection_cfg: dict,
 ) -> SmartSocketConnection:
+    """
+    Create and return a SmartSocketConnection instance from the provided configuration dictionary.
+    
+    Parameters:
+        connection_cfg (dict): Configuration parameters for initializing the SmartSocketConnection.
+    
+    Returns:
+        SmartSocketConnection: An instance initialized with the given configuration.
+    """
     cfg = OmegaConf.create(connection_cfg)
 
     return cast(SmartSocketConnection, SmartSocketConnection.from_cfg(cfg))
@@ -94,7 +121,9 @@ def test_init_from_cfg_valid_cfg(
     connection_cfg: dict, smart_socket_mock, mock_producer, expected_tokens
 ):
     """
-    Test the initialization of the SmartSocketConnection object from a valid configuration.
+    Test that SmartSocketConnection initializes correctly from a valid configuration.
+    
+    Asserts that the returned object is a SmartSocketConnection instance, verifies correct initialization of the internal SmartSocket with the provider config and Kafka producer, and checks that tokens are set as expected.
     """
 
     cfg = OmegaConf.create(connection_cfg)

@@ -13,16 +13,12 @@ logger = get_logger(Path(__file__).name)
 
 def get_smartapi_token_data() -> list[Instrument]:
     """
-    Fetches the token data from the SMARTAPI_TOKENS_URL and processes it to return the processed data.
-    It filters the data based on the exchange segment and instrument type and returns the processed data.
-    The exchange segment used here is NSE and the instrument types are EQ, SM, BE, ST.
-    Read more about the segments or groups in NSE
-    from: https://www.nseindia.com/market-data/legend-of-series
-
+    Fetch and process equity token data from the SMARTAPI provider for the NSE exchange.
+    
+    Filters instruments to include only those of types "EQ", "SM", "BE", or "ST", removes duplicates, and returns a list of `Instrument` objects representing unique equity instruments available via SMARTAPI.
+    
     Returns:
-    --------
-    ``list[Instrument]``
-        The processed token data as a list of Instrument objects
+        list[Instrument]: List of processed Instrument objects for NSE equities from SMARTAPI.
     """
     try:
         tokens_data = fetch_data(SMARTAPI_TOKENS_URL)
@@ -60,16 +56,12 @@ def get_smartapi_token_data() -> list[Instrument]:
 
 def get_uplink_token_data() -> list[Instrument]:
     """
-    Fetches the token data from the UPSTOX_TOKEN_URL and processes it to return the processed data.
-    It filters the data based on the segment and instrument type and returns the processed data.
-    The segment used here is BSE_EQ and the instrument types are A, B, X, T, XT, M, MT.
-    Read more about the segments or groups in BSE
-    from: https://www.bseindia.com/markets/equity/EQReports/tra_trading.aspx
-
+    Fetches and processes BSE equity token data from the UPSTOX data provider.
+    
+    Filters instruments to include only those in the "BSE_EQ" segment and with instrument types among "A", "B", "X", "T", "XT", "M", or "MT". Returns a list of unique `Instrument` objects representing the processed token data.
+     
     Returns:
-    --------
-    ``list[Instrument]``
-        The processed token data as a list of Instrument objects
+        list[Instrument]: List of processed Instrument objects for BSE equities from the UPLINK provider.
     """
     try:
         df = pd.read_json(UPSTOX_TOKEN_URL, compression="gzip")

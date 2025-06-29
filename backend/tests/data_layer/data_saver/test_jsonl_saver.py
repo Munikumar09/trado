@@ -24,7 +24,13 @@ from app.utils.file_utils import read_jsonl, write_jsonl
 @pytest.fixture
 def basic_config(temp_dir) -> DictConfig:
     """
-    Basic configuration for JSONLDataSaver.
+    Create a basic OmegaConf configuration for JSONLDataSaver with a specified temporary directory as the file path.
+    
+    Parameters:
+        temp_dir: Path to the temporary directory where the JSONL file will be saved.
+    
+    Returns:
+        DictConfig: OmegaConf configuration containing file path and Kafka streaming settings.
     """
     return OmegaConf.create(
         {
@@ -41,7 +47,7 @@ def basic_config(temp_dir) -> DictConfig:
 @pytest.fixture
 def mock_get_kafka_consumer(mocker: MockerFixture) -> MockType:
     """
-    Mock the get_kafka_consumer function.
+    Fixture that patches the get_kafka_consumer function, allowing tests to control Kafka consumer creation.
     """
     return mocker.patch(
         "app.data_layer.data_saver.saver.jsonl_saver.get_kafka_consumer"
@@ -51,7 +57,10 @@ def mock_get_kafka_consumer(mocker: MockerFixture) -> MockType:
 @pytest.fixture
 def mock_logger(mocker: MockerFixture) -> MockType:
     """
-    Mock the logger.
+    Creates a mock for the logger used in the JSONLDataSaver module for testing purposes.
+    
+    Returns:
+        MockType: The mocked logger object.
     """
     return mocker.patch("app.data_layer.data_saver.saver.jsonl_saver.logger")
 
@@ -59,7 +68,10 @@ def mock_logger(mocker: MockerFixture) -> MockType:
 @pytest.fixture(autouse=True)
 def mock_datetime(mocker: MockerFixture) -> MockType:
     """
-    Mock datetime.now for consistent testing.
+    Fixture that mocks `datetime.now` to always return a fixed date string for consistent test results.
+    
+    Returns:
+        MockType: The mocked datetime object with `now().strftime()` returning "2023_12_01".
     """
     mock_dt = mocker.patch("app.data_layer.data_saver.saver.jsonl_saver.datetime")
     mock_dt.now.return_value.strftime.return_value = "2023_12_01"
@@ -70,7 +82,7 @@ def mock_datetime(mocker: MockerFixture) -> MockType:
 @pytest.fixture
 def mock_consumer():
     """
-    Create a mock Kafka consumer.
+    Return a MagicMock instance simulating a Kafka consumer for testing purposes.
     """
     consumer = MagicMock()
     return consumer
@@ -79,7 +91,10 @@ def mock_consumer():
 @pytest.fixture
 def sample_json_data():
     """
-    Sample JSON data for testing.
+    Provides a list of sample JSON objects representing user data for use in tests.
+    
+    Returns:
+        list[dict]: A list of dictionaries with keys 'id', 'name', and 'value'.
     """
     return [
         {"id": 1, "name": "Alice", "value": 100.5},
@@ -91,7 +106,7 @@ def sample_json_data():
 @pytest.fixture
 def unicode_json_data():
     """
-    Unicode JSON data for testing.
+    Provides a list of JSON objects containing Unicode characters for use in tests.
     """
     return [
         {"id": 1, "name": "José", "city": "São Paulo", "emoji": "🎉"},
@@ -103,7 +118,7 @@ def unicode_json_data():
 @pytest.fixture
 def edge_case_json_data():
     """
-    Edge case JSON data for testing.
+    Return a list of JSON objects containing edge case values for testing, including nulls, booleans, large numbers, nested structures, arrays, and special characters.
     """
     return [
         {"null_value": None, "empty_string": "", "zero": 0},
@@ -122,7 +137,12 @@ def edge_case_json_data():
 
 def validate_jsonl_data_saver_instance(saver, mock_consumer, jsonl_path):
     """
-    Helper function to validate JSONLDataSaver instance.
+    Assert that a JSONLDataSaver instance is correctly initialized with the expected consumer and file path.
+    
+    Parameters:
+        saver: The JSONLDataSaver instance to validate.
+        mock_consumer: The expected Kafka consumer mock.
+        jsonl_path: The base path expected for the JSONL file.
     """
     assert isinstance(saver, JSONLDataSaver)
     assert saver.consumer == mock_consumer
@@ -133,7 +153,13 @@ def validate_jsonl_data_saver_instance(saver, mock_consumer, jsonl_path):
 
 def get_message(message_data):
     """
-    Helper function to create a mock Kafka message.
+    Create a mock Kafka message with its value set to the JSON-encoded representation of the provided data.
+    
+    Parameters:
+        message_data (dict): The data to encode as the message's value.
+    
+    Returns:
+        MagicMock: A mock Kafka message object with the specified value.
     """
     message = MagicMock()
     message.error.return_value = None
@@ -143,7 +169,13 @@ def get_message(message_data):
 
 def get_messages(message_data):
     """
-    Helper function to create a list of mock Kafka messages.
+    Create a list of mock Kafka message objects from a list of message data.
+    
+    Parameters:
+        message_data (list): A list of data items to be encoded in mock Kafka messages.
+    
+    Returns:
+        list: A list of mock Kafka message objects corresponding to the input data.
     """
     messages = []
     for data in message_data:
@@ -199,7 +231,7 @@ def test_init_preserves_existing_directories(mock_consumer, temp_dir):
 
 def test_init_from_config(basic_config):
     """
-    Test initialization using `init_from_cfg` function.
+    Test that the `init_from_cfg` function correctly initializes a `JSONLDataSaver` instance using the provided configuration.
     """
     saver = init_from_cfg(basic_config, DataSaver)
     validate_jsonl_data_saver_instance(
@@ -209,7 +241,9 @@ def test_init_from_config(basic_config):
 
 def test_from_cfg_success(basic_config, mock_get_kafka_consumer):
     """
-    Test successful creation from configuration.
+    Test that JSONLDataSaver is successfully created from configuration when a Kafka consumer is provided.
+    
+    Verifies that the instance is initialized with the correct consumer and file path, and that the Kafka consumer creation function is called once.
     """
     mock_consumer = MagicMock()
     mock_get_kafka_consumer.return_value = mock_consumer
@@ -223,8 +257,8 @@ def test_from_cfg_success(basic_config, mock_get_kafka_consumer):
 
 
 def test_from_cfg_no_consumer(basic_config, mock_get_kafka_consumer):
-    """T
-    est from_cfg when consumer creation fails.
+    """
+    Test that `from_cfg` returns None when Kafka consumer creation fails.
     """
     mock_get_kafka_consumer.return_value = None
 
@@ -238,7 +272,7 @@ def test_from_cfg_missing_jsonl_file_path(
     basic_config, mock_get_kafka_consumer, mock_logger
 ):
     """
-    Test from_cfg with missing jsonl_file_path.
+    Test that `from_cfg` returns None and logs an error when `jsonl_file_path` is missing from the configuration.
     """
     mock_consumer = MagicMock()
     mock_get_kafka_consumer.return_value = mock_consumer
@@ -256,7 +290,7 @@ def test_from_cfg_empty_jsonl_file_path(
     basic_config, mock_get_kafka_consumer, mock_logger
 ):
     """
-    Test from_cfg with empty jsonl_file_path.
+    Test that `from_cfg` returns None and logs an error when `jsonl_file_path` is empty in the configuration.
     """
     mock_consumer = MagicMock()
     mock_get_kafka_consumer.return_value = mock_consumer
@@ -272,7 +306,7 @@ def test_from_cfg_empty_jsonl_file_path(
 
 def test_from_cfg_kafka_config_passed_correctly(basic_config, mock_get_kafka_consumer):
     """
-    Test that Kafka configuration is passed correctly to get_kafka_consumer.
+    Verify that the Kafka configuration and topic from the provided config are correctly passed to the Kafka consumer creation function during initialization.
     """
     mock_consumer = MagicMock()
     mock_get_kafka_consumer.return_value = mock_consumer
@@ -300,7 +334,9 @@ def test_retrieve_and_save_single_message(
     basic_config,
 ):
     """
-    Test retrieving and saving a single message.
+    Test that a single Kafka message is retrieved and saved to a JSONL file.
+    
+    Verifies that the file is created, contains the correct message, the consumer is closed, and the appropriate log message is emitted.
     """
     mock_consumer.poll.side_effect = [
         mock_kafka_message,
@@ -331,7 +367,9 @@ def test_retrieve_and_save_multiple_messages(
     mock_consumer, basic_config, sample_data_list, mock_logger
 ):
     """
-    Test saving multiple messages to Jsonl.
+    Test that multiple Kafka messages are correctly saved to a JSONL file.
+    
+    Verifies that all provided messages are written to the file in order, the file contains the expected number of records, and an informational log is emitted upon completion.
     """
     messages = get_messages(sample_data_list)
 
@@ -354,7 +392,9 @@ def test_retrieve_and_save_file_append_mode(
     mock_consumer, temp_dir, sample_data_list, mock_logger
 ):
     """
-    Test that data is appended to existing file.
+    Test that the JSONLDataSaver appends new data to an existing JSONL file without overwriting previous content.
+    
+    Verifies that after saving additional messages, the file contains both the original and newly appended records in order.
     """
     file_path = f"{temp_dir}/append_test.jsonl"
 
@@ -399,7 +439,9 @@ def test_retrieve_and_save_consumer_closed(mock_consumer, temp_dir):
 
 def test_retrieve_and_save_no_messages(mock_consumer, basic_config, mock_logger):
     """
-    Test behavior when no messages are received.
+    Test that `retrieve_and_save` creates an empty JSONL file and closes the consumer when no messages are received.
+    
+    Verifies that the file is created but remains empty, the consumer is closed, and an info log is generated indicating zero messages saved.
     """
     mock_consumer.poll.side_effect = [None, None, None, KeyboardInterrupt()]
 
@@ -422,7 +464,7 @@ def test_retrieve_and_save_kafka_error(
     mock_logger,
 ):
     """
-    Test handling of Kafka errors.
+    Test that `JSONLDataSaver.retrieve_and_save` handles Kafka errors by logging the error and closing the consumer.
     """
     message = get_message({"error": {"code": 1}})
     mock_consumer.poll.return_value = [message]
@@ -452,7 +494,7 @@ def test_retrieve_and_save_file_permission_error(
     mock_consumer, temp_dir, mocker, mock_logger
 ):
     """
-    Test handling of file permission errors.
+    Test that JSONLDataSaver logs an error and closes the consumer when a file permission error occurs during saving.
     """
     # Mock open to raise PermissionError
     mocker.patch("builtins.open", side_effect=PermissionError("Permission denied"))
@@ -492,7 +534,7 @@ def test_retrieve_and_save_file_flushing(
     mock_consumer, basic_config, mock_kafka_message, mocker
 ):
     """
-    Test that file is flushed after each message.
+    Test that the JSONLDataSaver flushes the file after writing each message during retrieval and saving.
     """
     mock_file = mocker.MagicMock()
     mocker.patch("builtins.open", return_value=mock_file)
@@ -509,7 +551,7 @@ def test_retrieve_and_save_file_flushing(
 
 def test_retrieve_and_save_empty_json_object(mock_consumer, basic_config):
     """
-    Test handling of empty JSON objects.
+    Test that `JSONLDataSaver` correctly saves an empty JSON object from a Kafka message to the JSONL file.
     """
     message = get_message({})
     mock_consumer.poll.side_effect = [message, KeyboardInterrupt()]
@@ -527,7 +569,9 @@ def test_retrieve_and_save_empty_json_object(mock_consumer, basic_config):
 
 def test_retrieve_and_save_different_message_structures(mock_consumer, basic_config):
     """
-    Test handling of messages with different structures.
+    Tests that `JSONLDataSaver` correctly saves messages with varying JSON structures to a JSONL file.
+    
+    Verifies that multiple messages with different key sets are processed and written as separate records.
     """
     message_data = [{"a": 1, "b": 2}, {"c": 3, "d": 4}]
     messages = get_messages(message_data)
@@ -548,7 +592,7 @@ def test_retrieve_and_save_different_message_structures(mock_consumer, basic_con
 
 def test_retrieve_and_save_unicode_content(mock_consumer, basic_config):
     """
-    Test handling of Unicode content in messages.
+    Tests that `JSONLDataSaver` correctly saves and preserves Unicode and special character content from Kafka messages to a JSONL file.
     """
 
     message_data = {
@@ -579,7 +623,7 @@ def test_retrieve_and_save_unicode_content(mock_consumer, basic_config):
 
 def test_retrieve_and_save_general_exception(mock_consumer, basic_config, mock_logger):
     """
-    Test handling of general exceptions.
+    Test that `JSONLDataSaver.retrieve_and_save` logs an error and closes the consumer when a general exception occurs during message polling.
     """
     saver = JSONLDataSaver(mock_consumer, basic_config.jsonl_file_path)
 
@@ -603,7 +647,9 @@ def test_retrieve_and_save_null_values(
     mock_consumer, basic_config, edge_case_json_data
 ):
     """
-    Test saving data with null values and edge cases.
+    Test that JSONLDataSaver correctly saves messages containing null values and edge case data.
+    
+    Verifies that all records with nulls and edge cases are written to the JSONL file and match the expected input.
     """
     saver = JSONLDataSaver(mock_consumer, basic_config.jsonl_file_path)
 
@@ -624,7 +670,7 @@ def test_retrieve_and_save_null_values(
 
 def test_retrieve_and_save_large_json_object(mock_consumer, basic_config):
     """
-    Test saving large JSON objects.
+    Test that the JSONLDataSaver correctly saves large JSON objects, including large arrays, long strings, and deeply nested structures, and that the saved file contains the expected data.
     """
     saver = JSONLDataSaver(mock_consumer, basic_config.jsonl_file_path)
 
@@ -657,7 +703,7 @@ def test_retrieve_and_save_large_json_object(mock_consumer, basic_config):
 
 def test_pandas_compatibility(mock_consumer, basic_config, sample_json_data):
     """
-    Test that saved JSONL files can be read by pandas.
+    Verifies that JSONL files saved by JSONLDataSaver can be read into pandas DataFrames with correct structure and data integrity.
     """
     saver = JSONLDataSaver(mock_consumer, basic_config.jsonl_file_path)
     messages = get_messages(sample_json_data)
@@ -686,7 +732,7 @@ def test_pandas_compatibility(mock_consumer, basic_config, sample_json_data):
 
 def test_concurrent_file_access(mock_consumer, basic_config):
     """
-    Test behavior with concurrent file access scenarios.
+    Tests that JSONLDataSaver correctly appends new data to a JSONL file when the file is already populated, simulating concurrent file access.
     """
     saver = JSONLDataSaver(mock_consumer, basic_config.jsonl_file_path)
     test_data = [{"initial": "data"}, {"new": "data"}]

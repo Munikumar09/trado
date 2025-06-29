@@ -79,6 +79,11 @@ class UplinkSocketConnection(WebsocketConnection):
 
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["UplinkSocketConnection"]:
+        """
+        Create an `UplinkSocketConnection` instance from a configuration object.
+        
+        Attempts to initialize the connection using the specified exchange, symbols, and provider from the configuration. Returns `None` if the configuration is invalid or initialization fails.
+        """
         try:
             exchange = ExchangeType.get_exchange(cfg.exchange_type)
 

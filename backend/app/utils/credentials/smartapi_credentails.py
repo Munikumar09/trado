@@ -37,12 +37,10 @@ class SmartapiCredentials(Credentials):
     @classmethod
     def get_credentials(cls) -> "SmartapiCredentials":
         """
-        Create a Credentials object from the credentials file.
-
+        Retrieve SmartAPI credentials from environment variables and return a SmartapiCredentials instance.
+        
         Returns:
-        --------
-        ``SmartapiCredentials``
-            The credentials object with the API key, client id, password, token and correlation id
+            SmartapiCredentials: An instance initialized with API key, client ID, password, and token obtained from environment variables.
         """
         api_key = get_env_var("SMARTAPI_API_KEY")
         client_id = get_env_var("SMARTAPI_CLIENT_ID")

@@ -40,10 +40,7 @@ def test_resolve_path_with_existing_file() -> None:
 
 def test_load_json_data_with_existing_file() -> None:
     """
-    Test function to check if the load_json_data function can load data from an existing
-    file. It creates a temporary file, writes data to it, and then tests the function with
-    the file path. It also tests the function with a non-existing file path to check if it
-    raises a FileNotFoundError.
+    Tests that the load_json_data function correctly loads JSON data from an existing file and raises FileNotFoundError for a non-existent file.
     """
     # Creating a new temporary file
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as fp:

@@ -41,9 +41,9 @@ from app.data_layer.streaming.consumers.kafka_consumer import (
 @pytest.fixture
 def mock_logger():
     """
-    Unified fixture that provides a mock logger for testing log output.
-    This fixture is shared across all tests and ensures consistent logging
-    verification throughout the test suite.
+    Provides a pytest fixture that yields a mock logger for verifying log output in tests.
+    
+    This fixture patches the Kafka consumer's logger, enabling consistent and isolated logging assertions across the test suite.
     """
     with patch("app.data_layer.streaming.consumers.kafka_consumer.logger") as mock:
         yield mock
@@ -51,7 +51,10 @@ def mock_logger():
 
 def _create_mock_redis_client():
     """
-    Helper function to create consistent mock Redis client.
+    Create a mock Redis client with async methods for testing purposes.
+    
+    Returns:
+        AsyncMock: A mock Redis client with async `ping`, `publish`, `close`, and `flushdb` methods.
     """
     mock_client = AsyncMock()
     mock_client.ping = AsyncMock()
@@ -64,9 +67,10 @@ def _create_mock_redis_client():
 @pytest.fixture(autouse=True)
 def mock_redis_connection():
     """
-    Unified fixture that provides a mock Redis connection and client. This mocks all Redis
-    dependencies including connection management, client operations, and cleanup. Used for
-    isolating Redis operations during testing.
+    Fixture that provides a fully mocked Redis connection and client for testing.
+    
+    Yields:
+        dict: Contains the mocked Redis connection, client, and connection class for use in tests.
     """
     mock_redis_client = _create_mock_redis_client()
 
@@ -88,8 +92,10 @@ def mock_redis_connection():
 @pytest.fixture
 def mock_update_stock_cache():
     """
-    Fixture that mocks the update_stock_cache function. Isolates cache updating logic
-    from message consumption logic.
+    Fixture that provides a mocked asynchronous `update_stock_cache` function for use in tests.
+    
+    Yields:
+        AsyncMock: The mocked `update_stock_cache` function, allowing tests to isolate cache update behavior from message consumption logic.
     """
     with patch(
         "app.data_layer.streaming.consumers.kafka_consumer.update_stock_cache",
@@ -100,7 +106,10 @@ def mock_update_stock_cache():
 
 def _create_mock_confluent_consumer():
     """
-    Helper function to create consistent mock Confluent Kafka consumer.
+    Create a mock Confluent Kafka consumer with mocked subscribe, poll, and close methods.
+    
+    Returns:
+        MagicMock: A mock Kafka consumer instance with subscribe, poll, and close methods.
     """
     instance = MagicMock()
     instance.subscribe = MagicMock()
@@ -112,9 +121,9 @@ def _create_mock_confluent_consumer():
 @pytest.fixture(autouse=True)
 def patch_confluent_consumer():
     """
-    Auto-used fixture that patches the Confluent Kafka Consumer. This ensures all tests
-    use mocked Kafka consumers instead of real ones, preventing external dependencies
-    and making tests deterministic.
+    Automatically patches the Confluent Kafka Consumer with a mock for all tests.
+    
+    This fixture ensures that all Kafka consumer interactions use a mock implementation, isolating tests from external Kafka dependencies and enabling deterministic test behavior.
     """
     with patch(
         "app.data_layer.streaming.consumers.kafka_consumer.ConfluentConsumer",
@@ -127,8 +136,10 @@ def patch_confluent_consumer():
 @pytest.fixture(autouse=True)
 def patch_redis_utils():
     """
-    Auto-used fixture that patches Redis utilities. Ensures Redis operations are mocked
-    consistently across all tests.
+    Auto-used pytest fixture that patches Redis utility modules with mocks for both synchronous and asynchronous Redis operations.
+    
+    Yields:
+        dict: A dictionary containing the mocked synchronous ('sync') and asynchronous ('async') Redis modules for use in tests.
     """
     redis_instance = _create_mock_redis_client()
 
@@ -144,8 +155,10 @@ def patch_redis_utils():
 @pytest.fixture
 def sample_kafka_message():
     """
-    Fixture providing a sample Kafka message payload. Represents a typical market data
-    message for consistent testing.
+    Provides a sample Kafka message payload representing typical market data for use in tests.
+    
+    Returns:
+        dict: A dictionary containing fields such as timestamps, symbol, exchange ID, price, quantity, and volume.
     """
     return {
         "retrieval_timestamp": 1640995200000,
@@ -165,8 +178,10 @@ def sample_kafka_message():
 @pytest.fixture
 def sample_transformed_message():
     """
-    Fixture providing the expected transformed message format. Represents the expected
-    output after _transform_message processing.
+    Provides a sample transformed message dictionary representing the expected output of the message transformation process in tests.
+    
+    Returns:
+        dict: A dictionary with standardized market data fields for use in test assertions.
     """
     return {
         "retrieval_timestamp": 1640995200000,
@@ -199,8 +214,10 @@ def test_kafka_config():
 @pytest.fixture
 def basic_kafka_consumer(test_kafka_config):
     """
-    Fixture that creates a basic KafkaConsumer for method-level testing. Used for tests
-    that focus on individual methods rather than the full consume_messages integration.
+    Fixture that provides a KafkaConsumer instance for method-level tests.
+    
+    Yields:
+        KafkaConsumer: An instance configured with test Kafka settings for isolated method testing. Ensures cleanup after use.
     """
     consumer = KafkaConsumer(
         topic=test_kafka_config["topic"],
@@ -214,7 +231,10 @@ def basic_kafka_consumer(test_kafka_config):
 
 def _create_kafka_consumer_with_mocks():
     """
-    Helper function to create KafkaConsumer with mocked dependencies.
+    Creates a KafkaConsumer instance with mocked Kafka consumer and executor for testing purposes.
+    
+    Returns:
+        dict: A dictionary containing the KafkaConsumer instance, the mocked Kafka consumer, and the patched consumer class.
     """
     mock_consumer_instance = _create_mock_confluent_consumer()
 
@@ -238,10 +258,9 @@ def _create_kafka_consumer_with_mocks():
 @pytest.fixture
 def kafka_consumer_with_mocks():
     """
-    Fixture that creates a KafkaConsumer with all external dependencies mocked.
-
-    Provides a fully isolated consumer instance for comprehensive testing
-    of the consume_messages method and related functionality.
+    Fixture that provides a KafkaConsumer instance with all external dependencies mocked.
+    
+    Yields a fully isolated KafkaConsumer for integration and behavioral testing, ensuring no real connections to Kafka or Redis are made. Cleans up the singleton instance after use.
     """
     consumer_data = _create_kafka_consumer_with_mocks()
 
@@ -258,7 +277,7 @@ def kafka_consumer_with_mocks():
 
 def _cleanup_kafka_consumer():
     """
-    Helper function to clean up KafkaConsumer instances.
+    Removes all existing KafkaConsumer singleton instances to ensure a clean test environment.
     """
     KafkaConsumer.clear_instance(KafkaConsumer)
 
@@ -295,10 +314,9 @@ def test_kafka_consumer_default_initialization():
 
 def test_kafka_consumer_custom_initialization():
     """
-    Test KafkaConsumer initialization with custom values.
-
-    Verifies that custom configuration is properly applied and overrides
-    default values as expected.
+    Test that KafkaConsumer initializes with custom configuration values.
+    
+    Verifies that user-supplied topic, group ID, brokers, and config dictionary override the default KafkaConsumer settings.
     """
     config = {
         "auto.offset.reset": "latest",
@@ -349,7 +367,15 @@ def test_kafka_consumer_from_cfg():
 
 
 def _create_mock_message(content="test message"):
-    """Helper function to create mock Kafka message."""
+    """
+    Create a mock Kafka message object with the specified content.
+    
+    Parameters:
+        content (str): The message content to encode as the mock message value. Defaults to "test message".
+    
+    Returns:
+        MagicMock: A mock Kafka message with encoded value and no error.
+    """
     msg_mock = MagicMock()
     msg_mock.value.return_value = content.encode()
     msg_mock.error.return_value = None
@@ -358,9 +384,7 @@ def _create_mock_message(content="test message"):
 
 def test_poll_message_success(basic_kafka_consumer):
     """
-    Test successful message polling.
-
-    Verifies that messages are correctly retrieved and decoded from Kafka.
+    Tests that _poll_message successfully retrieves and decodes a message from the Kafka consumer.
     """
     msg_mock = _create_mock_message("test message")
     basic_kafka_consumer.consumer.poll.return_value = msg_mock
@@ -384,9 +408,7 @@ def test_poll_message_none(basic_kafka_consumer):
 
 def test_poll_message_kafka_exception(basic_kafka_consumer):
     """
-    Test polling with Kafka exceptions.
-
-    Verifies that Kafka exceptions are properly propagated when polling fails.
+    Test that `_poll_message` raises a `KafkaException` when the Kafka consumer's `poll` method fails.
     """
     basic_kafka_consumer.consumer.poll.side_effect = KafkaException("Poll error")
 
@@ -397,7 +419,13 @@ def test_poll_message_kafka_exception(basic_kafka_consumer):
 
 
 def _assert_transformed_message_fields(transformed, original):
-    """Helper function to verify transformed message fields."""
+    """
+    Assert that the transformed message fields match the expected values from the original message.
+    
+    Parameters:
+        transformed (dict): The transformed message to verify.
+        original (dict): The original message containing expected values.
+    """
     assert transformed["symbol"] == original["symbol"]
     assert transformed["exchange"] == "NSE"
     assert transformed["data_provider"] == "SMARTAPI"
@@ -413,10 +441,9 @@ def _assert_transformed_message_fields(transformed, original):
 
 def test_transform_message(basic_kafka_consumer, sample_kafka_message):
     """
-    Test message transformation.
-
-    Verifies that raw Kafka messages are correctly transformed into the
-    expected format with proper field mapping.
+    Tests that the KafkaConsumer correctly transforms a raw Kafka message into the expected structured format.
+    
+    Verifies that all relevant fields are mapped accurately from the input message to the transformed output.
     """
     transformed = basic_kafka_consumer._transform_message(sample_kafka_message)
     _assert_transformed_message_fields(transformed, sample_kafka_message)
@@ -425,7 +452,14 @@ def test_transform_message(basic_kafka_consumer, sample_kafka_message):
 def _verify_successful_message_processing(
     client, mock_update_stock_cache, sample_transformed_message
 ):
-    """Helper function to verify successful message processing."""
+    """
+    Verify that a transformed message was published to the correct Redis channel and that the stock cache was updated.
+    
+    Parameters:
+        client: The mocked Redis client used for publishing.
+        mock_update_stock_cache: The mocked function for updating the stock cache.
+        sample_transformed_message: The transformed message expected to be published and cached.
+    """
     expected_channel = f"stock:{sample_transformed_message['symbol']}_NSE"
 
     client.publish.assert_called_once_with(
@@ -448,10 +482,9 @@ async def test_process_message_success(
     mock_update_stock_cache,
 ):
     """
-    Test successful message processing.
-
-    Verifies that transformed messages are correctly published to Redis
-    and cache is updated appropriately.
+    Tests that a transformed message is successfully processed by publishing it to Redis and updating the cache.
+    
+    Verifies that the `process_message` method publishes the message to Redis and invokes the cache update function with the correct data.
     """
     client = mock_redis_connection["client"]
 
@@ -471,10 +504,9 @@ async def test_process_message_missing_symbol(
     mock_logger,
 ):
     """
-    Test message processing with missing required fields.
-
-    Verifies that messages missing required fields are handled gracefully
-    with appropriate warning logging.
+    Test that processing a message missing required fields logs a warning and skips Redis operations.
+    
+    Verifies that when a message lacks the 'symbol' or 'exchange' field, the consumer logs a warning and does not publish to Redis or update the stock cache.
     """
     client = mock_redis_connection["client"]
 
@@ -502,10 +534,9 @@ async def test_process_message_redis_error(
     mock_logger,
 ):
     """
-    Test message processing with Redis errors.
-
-    Verifies that Redis errors are properly caught and logged with
-    appropriate error details.
+    Test that Redis errors during message processing are raised and logged.
+    
+    Verifies that when a Redis publish operation fails during message processing, the exception is propagated and an error is logged with the relevant message and error details.
     """
     client = mock_redis_connection["client"]
     client.publish.side_effect = Exception("Redis publish error")
@@ -528,9 +559,7 @@ async def test_process_message_redis_error(
 
 def test_handle_consume_error_scenarios(basic_kafka_consumer, mock_logger):
     """
-    Test handling of different error types including JSON, Kafka, and general exceptions.
-
-    Verifies that all error types are logged with appropriate detail for debugging.
+    Tests that the KafkaConsumer's error handler logs JSON decode errors, Kafka exceptions, and general exceptions with the correct log level and detail.
     """
     # Test JSON decode error
     json_err = json.JSONDecodeError("msg", "doc", 0)
@@ -580,14 +609,19 @@ async def test_apply_backoff_logs_and_sleeps(
     log_level,
 ):
     """
-    Test exponential backoff behavior with different error counts.
-
-    Verifies that backoff sleep times increase exponentially and that
-    appropriate log levels are used based on error severity.
+    Asynchronously tests that the exponential backoff mechanism logs at the correct level and sleeps for the expected duration based on the number of consecutive errors.
+    
+    Verifies that:
+    - The logger is called with the correct log level, format string, and arguments.
+    - The backoff sleep duration increases as expected.
+    - The sleep function is invoked with a positive value.
     """
     sleep_called = {}
 
     async def fake_sleep(secs):
+        """
+        Mocks an asynchronous sleep by recording the requested duration in the `sleep_called` dictionary.
+        """
         sleep_called["secs"] = secs
 
     monkeypatch.setattr("asyncio.sleep", fake_sleep)
@@ -618,7 +652,16 @@ async def test_apply_backoff_logs_and_sleeps(
 
 
 async def _create_async_task_with_timeout(consumer, timeout=1.0):
-    """Helper function to create and manage async tasks with timeout."""
+    """
+    Run the consumer's message consumption asynchronously with a timeout, ensuring cleanup on timeout.
+    
+    Parameters:
+        consumer: The KafkaConsumer instance whose consume_messages coroutine will be run.
+        timeout (float): Maximum time in seconds to allow the task to run before attempting to stop the consumer.
+    
+    Returns:
+        task: The asyncio.Task object representing the running consume_messages coroutine.
+    """
     task = asyncio.create_task(consumer.consume_messages())
 
     try:
@@ -634,10 +677,24 @@ async def _create_async_task_with_timeout(consumer, timeout=1.0):
 
 
 def _create_mock_executor_with_counter(consumer, stop_after=5):
-    """Helper function to create mock executor that stops after a certain number of calls."""
+    """
+    Create a mock asynchronous executor function that counts its invocations and stops the given consumer after a specified number of calls.
+    
+    Parameters:
+    	stop_after (int): The number of calls after which the consumer will be stopped. Defaults to 5.
+    
+    Returns:
+    	mock_run_in_executor (Callable): An async function simulating executor behavior and triggering consumer stop.
+    	get_call_count (Callable): A function returning the current call count.
+    """
     call_count = 0
 
     async def mock_run_in_executor(*_):
+        """
+        Simulates asynchronous execution in an executor, incrementing a call counter and stopping the consumer after a specified number of calls.
+        
+        This mock is used to control the flow of message consumption in tests by stopping the consumer after a set number of invocations.
+        """
         nonlocal call_count
         call_count += 1
         if call_count >= stop_after:
@@ -648,7 +705,15 @@ def _create_mock_executor_with_counter(consumer, stop_after=5):
 
 
 def _setup_mock_loop_with_executor(mock_executor_func):
-    """Helper function to set up mock event loop with executor."""
+    """
+    Create a mocked asynchronous event loop with a custom executor function for testing.
+    
+    Parameters:
+        mock_executor_func (callable): Function to be used as the side effect for the event loop's run_in_executor method.
+    
+    Returns:
+        AsyncMock: A mock event loop with run_in_executor configured to use the provided executor function.
+    """
     mock_loop = AsyncMock()
     mock_loop.run_in_executor = AsyncMock(side_effect=mock_executor_func)
     return mock_loop
@@ -663,15 +728,9 @@ async def test_successful_message_consumption_and_processing(
     mock_logger,
 ):
     """
-    Test the complete successful flow of message consumption and processing.
-
-    This is the most important test as it verifies the core functionality:
-    1. Messages are polled from Kafka successfully
-    2. Raw JSON is parsed correctly
-    3. Messages are transformed to the expected format
-    4. Messages are published to Redis channels
-    5. Cache is updated with the latest data
-    6. No errors occur during normal operation
+    Asynchronously tests the end-to-end flow of consuming and processing a Kafka message.
+    
+    Verifies that a message is polled from Kafka, parsed, transformed, published to Redis, and the cache is updated, with all expected logging and no errors during normal operation.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -679,6 +738,12 @@ async def test_successful_message_consumption_and_processing(
 
     async def mock_run_in_executor(*_):
         # Return the message on first call, None on subsequent calls to stop the loop
+        """
+        Simulates an executor function that returns a predefined message on the first call and None on subsequent calls.
+        
+        Returns:
+            The predefined raw message on the first invocation; None on all subsequent invocations.
+        """
         if not hasattr(mock_run_in_executor, "called"):
             mock_run_in_executor.called = True
             return raw_message
@@ -721,10 +786,9 @@ async def test_successful_message_consumption_and_processing(
 @pytest.mark.asyncio
 async def test_no_messages_available_continues_polling(kafka_consumer_with_mocks):
     """
-    Test that the consumer continues polling when no messages are available.
-
-    Verifies continuous polling behavior and appropriate sleep intervals
-    when no messages are received from Kafka.
+    Test that the Kafka consumer continues polling and sleeping when no messages are available.
+    
+    This test verifies that the consumer repeatedly polls for messages and invokes sleep intervals when no messages are received from Kafka, ensuring continuous operation in the absence of new data.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -750,10 +814,9 @@ async def test_no_messages_available_continues_polling(kafka_consumer_with_mocks
 @pytest.mark.asyncio
 async def test_error_handling_patterns_and_backoff(kafka_consumer_with_mocks):
     """
-    Test comprehensive error handling including JSON, Kafka, and runtime errors with backoff.
-
-    Verifies that all error types are handled gracefully and backoff is applied.
-    This consolidates testing of different error scenarios.
+    Test that the consumer handles various error types and applies backoff during message consumption.
+    
+    Simulates sequential JSON decoding errors, Kafka exceptions, and runtime errors to verify that each is handled gracefully and that the backoff mechanism is invoked for each error scenario.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -762,6 +825,12 @@ async def test_error_handling_patterns_and_backoff(kafka_consumer_with_mocks):
     call_count = 0
 
     async def mock_run_in_executor(*_):
+        """
+        Simulates asynchronous execution of message polling with controlled error scenarios for testing.
+        
+        Returns:
+            str or None: Returns an invalid JSON string on the first call, raises a KafkaException on the second call, raises a RuntimeError on the third call, and stops the consumer and returns None on subsequent calls.
+        """
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -797,10 +866,9 @@ async def test_process_message_exception_handling(
     sample_transformed_message,
 ):
     """
-    Test handling of exceptions during message processing (Redis/cache operations).
-
-    Verifies that exceptions in process_message are handled gracefully
-    and the consumer continues operating after processing errors.
+    Test that exceptions raised during message processing are handled without crashing the consumer.
+    
+    Simulates an exception in `process_message` (such as a Redis failure) and verifies that error handling and backoff mechanisms are invoked, allowing the consumer to continue operating after the error.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -809,6 +877,12 @@ async def test_process_message_exception_handling(
     call_count = 0
 
     async def mock_run_in_executor(*_):
+        """
+        Simulates asynchronous execution of a function in an executor, returning a raw message on the first call and stopping the consumer on the second call.
+        
+        Returns:
+            The raw message on the first invocation; None on subsequent calls.
+        """
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -848,10 +922,7 @@ async def test_process_message_exception_handling(
 @pytest.mark.asyncio
 async def test_consecutive_errors_trigger_backoff(kafka_consumer_with_mocks):
     """
-    Test that consecutive errors trigger exponential backoff behavior.
-
-    Verifies that error count increases with consecutive failures and
-    backoff sleep time increases exponentially.
+    Asynchronously tests that consecutive processing errors in the KafkaConsumer trigger exponential backoff, with increasing sleep durations after each failure.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -859,6 +930,11 @@ async def test_consecutive_errors_trigger_backoff(kafka_consumer_with_mocks):
     call_count = 0
 
     async def mock_run_in_executor(*_):
+        """
+        Simulates an executor function that raises a RuntimeError for the first three calls, then stops the consumer.
+        
+        This mock is used to test error handling and backoff logic by triggering consecutive errors before allowing the consumer to stop.
+        """
         nonlocal call_count
         call_count += 1
         if call_count <= 3:  # Simulate 3 consecutive errors
@@ -896,10 +972,9 @@ async def test_successful_processing_resets_error_count(
     sample_transformed_message,
 ):
     """
-    Test that successful message processing resets the error count.
-
-    Verifies that error count resets to 0 after successful processing
-    and subsequent errors start backoff from the beginning.
+    Test that the error count in the KafkaConsumer resets after successful message processing.
+    
+    Simulates consecutive errors, a successful message processing, and a subsequent error to verify that the backoff mechanism restarts from the initial state after a successful operation.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -908,6 +983,12 @@ async def test_successful_processing_resets_error_count(
     raw_message = json.dumps(sample_kafka_message)
 
     async def mock_run_in_executor(*_):
+        """
+        Simulates an asynchronous executor that raises an error on the first call, returns a raw message on the second, raises another error on the third, and stops the consumer on subsequent calls.
+        
+        Returns:
+            The raw message on the second call; None after stopping the consumer.
+        """
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -957,10 +1038,9 @@ async def test_successful_processing_resets_error_count(
 @pytest.mark.asyncio
 async def test_consumer_restart_scenarios(kafka_consumer_with_mocks):
     """
-    Test consumer restart after maximum attempts and prolonged failures.
-
-    Verifies both attempt-based and time-based restart logic work correctly
-    for scenarios where errors persist.
+    Test that the Kafka consumer restarts correctly after exceeding maximum backoff attempts due to persistent errors.
+    
+    Simulates repeated failures during message consumption to verify that both attempt-based and time-based restart mechanisms trigger as expected. Ensures that backoff logic is applied, the consumer is closed and restarted, and resource cleanup occurs after persistent errors.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -968,6 +1048,12 @@ async def test_consumer_restart_scenarios(kafka_consumer_with_mocks):
     call_count = 0
 
     async def mock_run_in_executor(*_):
+        """
+        Simulates an executor function that raises a RuntimeError for a set number of calls, then stops the consumer.
+        
+        Raises:
+            RuntimeError: For each call until the maximum backoff attempts are exceeded.
+        """
         nonlocal call_count
         call_count += 1
         if call_count <= MAX_BACKOFF_ATTEMPTS + 1:
@@ -1014,10 +1100,9 @@ async def test_resource_management_and_cleanup(
     kafka_consumer_with_mocks, mock_redis_connection
 ):
     """
-    Test comprehensive resource management including graceful shutdown, cleanup, and stop method.
-
-    Verifies that resources are properly cleaned up during cancellation, finally blocks,
-    and stop method calls.
+    Test that the KafkaConsumer performs proper resource cleanup and state management during shutdown.
+    
+    This test verifies that resources such as Redis connections are closed and the consumer's run state is reset to `False` when the consumer is cancelled or stopped.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -1055,10 +1140,9 @@ async def test_fatal_error_propagation_with_cleanup(
     kafka_consumer_with_mocks, mock_redis_connection
 ):
     """
-    Test that fatal errors are propagated while still performing cleanup.
-
-    Verifies that fatal errors like Redis startup failures are not caught
-    but resources are still cleaned up appropriately.
+    Test that fatal errors during startup propagate exceptions while ensuring resource cleanup.
+    
+    Simulates a Redis connection failure during consumer startup and verifies that the exception is raised and resources are properly cleaned up.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -1086,10 +1170,12 @@ async def test_edge_cases_and_special_scenarios(
     kafka_consumer_with_mocks, mock_redis_connection, mock_logger
 ):
     """
-    Test comprehensive edge cases including Redis failures, empty messages, and large messages.
-
-    Verifies that various edge cases are handled gracefully including startup failures,
-    empty transformed messages, and large message log truncation.
+    Test handling of edge cases in KafkaConsumer, including Redis startup failures, empty transformed messages, and large message logging.
+    
+    This test verifies that:
+    - Redis connection failures during consumer startup raise exceptions and are propagated.
+    - The consumer handles empty transformed messages by calling `process_message` with `None`.
+    - Large raw messages are logged in debug output with truncation to a maximum of 200 characters plus ellipsis.
     """
     consumer_data = kafka_consumer_with_mocks
     consumer = consumer_data["consumer"]
@@ -1117,6 +1203,12 @@ async def test_edge_cases_and_special_scenarios(
     call_count = 0
 
     async def mock_run_in_executor_empty(*_):
+        """
+        Simulates an executor that returns a raw message on the first call and stops the consumer on subsequent calls.
+        
+        Returns:
+            The raw message on the first invocation; None on subsequent invocations after stopping the consumer.
+        """
         nonlocal call_count
         call_count += 1
 
@@ -1149,6 +1241,12 @@ async def test_edge_cases_and_special_scenarios(
     large_raw_message = json.dumps(large_message)
 
     async def mock_run_in_executor_large(*_):
+        """
+        Simulates asynchronous execution of a function that returns a large raw message on the first call and stops the consumer on subsequent calls.
+        
+        Returns:
+            The large raw message on the first invocation; None on subsequent calls after stopping the consumer.
+        """
         nonlocal call_count
         call_count += 1
         if call_count == 1:

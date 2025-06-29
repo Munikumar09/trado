@@ -33,7 +33,10 @@ app.include_router(authentication.router)
 @app.get("/", summary="Root endpoint", tags=["General"])
 async def index():
     """
-    Root endpoint to verify API is running
+    Returns basic service information to confirm that the API is operational.
+    
+    Returns:
+        dict: A JSON object containing the service name, API version, and running status.
     """
     return {
         "service": SERVICE_NAME,
@@ -45,8 +48,10 @@ async def index():
 @app.get("/health", summary="Health Check", tags=["General"])
 async def health_check():
     """
-    Comprehensive health check for all system components.
-    Returns detailed status of each component.
+    Performs a comprehensive health check of Kafka consumer, WebSocket server, and Redis client, returning a detailed JSON status report.
+    
+    Returns:
+        JSONResponse: A JSON object containing the status of each system component, Redis latency if available, current timestamp, API version, and overall health status. Returns HTTP 200 if all critical components are healthy, otherwise HTTP 503.
     """
     # Check Kafka status
     kafka_status = "unknown"
@@ -120,8 +125,9 @@ async def health_check():
 # --- Main Entry Point ---
 async def start_uvicorn_server():
     """
-    Start the Uvicorn server with the specified configuration.
-    Handle signals gracefully.
+    Launch the Uvicorn server with configuration from environment variables, enabling asyncio event loop and optional auto-reload.
+    
+    Reads host, port, log level, and reload settings from environment variables. Awaits the server's execution and handles graceful shutdown on termination signals.
     """
     host = os.getenv("API_HOST", "127.0.0.1")
     port = int(os.getenv("API_PORT", "8000"))

@@ -10,12 +10,10 @@ from app.utils.common.types.financial_types import DataProviderType, ExchangeTyp
 @pytest.fixture
 def kafka_data() -> list[dict]:
     """
-    This fixture returns the sample data that is retrieved from kafka consumer.
-
+    Provides sample financial data as a list of dictionaries for use in Kafka consumer-related tests.
+    
     Returns:
-    --------
-    ``list[dict]``
-        Sample data retrieved from kafka consumer
+        list[dict]: Sample data entries representing financial market information.
     """
     return [
         {
@@ -76,7 +74,10 @@ def kafka_data() -> list[dict]:
 @pytest.fixture
 def temp_dir():
     """
-    Create a temporary directory for test files.
+    Provides a temporary directory for use in tests, ensuring automatic cleanup after the test completes.
+    
+    Yields:
+        str: The path to the temporary directory.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
@@ -85,7 +86,10 @@ def temp_dir():
 @pytest.fixture
 def sample_data_list():
     """
-    Sample data for testing.
+    Provides a list of sample stock data dictionaries for use in tests.
+    
+    Returns:
+        list: A list of dictionaries, each containing symbol, price, volume, and timestamp fields.
     """
     return [
         {"symbol": "AAPL", "price": 150.25, "volume": 1000, "timestamp": 1640995200},
@@ -97,7 +101,9 @@ def sample_data_list():
 @pytest.fixture
 def mock_kafka_message(sample_data_list):
     """
-    Mock Kafka message with valid JSON data.
+    Create a mock Kafka message object containing a JSON-encoded payload from sample data.
+    
+    The mock simulates a Kafka message with no error and a value corresponding to the first element of the provided sample data list.
     """
     message = MagicMock()
     message.error.return_value = None

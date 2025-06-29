@@ -50,7 +50,10 @@ CHANNEL = "test_channel"
 @pytest.fixture
 def mock_logger():
     """
-    Mock logger for testing log outputs.
+    Provides a mock logger for use in tests to capture and assert log outputs.
+    
+    Yields:
+        A mocked logger object patched into the websocket_server_manager module.
     """
     with patch("app.sockets.websocket_server_manager.logger") as mock_log:
         yield mock_log
@@ -59,7 +62,10 @@ def mock_logger():
 @pytest.fixture
 def mock_pubsub():
     """
-    Mock Redis PubSub client.
+    Create and return a mock Redis PubSub client with asynchronous methods for testing purposes.
+    
+    Returns:
+        MagicMock: A mock object simulating a Redis PubSub client with async subscribe, unsubscribe, close, and listen methods.
     """
     pubsub_mock = MagicMock()
     pubsub_mock.subscribe = AsyncMock()
@@ -73,7 +79,10 @@ def mock_pubsub():
 @pytest.fixture
 def mock_redis(mock_pubsub):
     """
-    Mock Redis client for testing.
+    Create a mock Redis client with a mocked pubsub and ping method for use in tests.
+    
+    Returns:
+        AsyncMock: A mocked Redis client instance with pubsub and ping attributes set.
     """
     redis_mock = AsyncMock()
     redis_mock.pubsub = mock_pubsub
@@ -85,7 +94,10 @@ def mock_redis(mock_pubsub):
 @pytest.fixture
 def mock_pubsub_manager():
     """
-    Mock RedisPubSubManager for ConnectionManager tests.
+    Create a mock instance of RedisPubSubManager with asynchronous subscribe and unsubscribe methods for use in ConnectionManager tests.
+    
+    Returns:
+        AsyncMock: A mocked RedisPubSubManager with async subscribe and unsubscribe methods.
     """
     manager = AsyncMock()
     manager.subscribe = AsyncMock()
@@ -96,7 +108,10 @@ def mock_pubsub_manager():
 @pytest.fixture
 def mock_websocket_client():
     """
-    Mock WebSocket client for testing.
+    Create and return a mock WebSocket client with predefined peer ID and mocked send and close methods for testing purposes.
+    
+    Returns:
+        MagicMock: A mock WebSocket client object with 'peer', 'sendMessage', and 'close' attributes.
     """
     client_mock = MagicMock()
     client_mock.peer = "test_client_123"
@@ -109,7 +124,10 @@ def mock_websocket_client():
 @pytest.fixture
 def sample_stock_data():
     """
-    Sample stock data for testing.
+    Return a sample stock data dictionary for use in tests.
+    
+    Returns:
+        dict: A dictionary containing example stock information including symbol, price, volume, and timestamp.
     """
     return {
         "symbol": "AAPL",
@@ -122,7 +140,10 @@ def sample_stock_data():
 @pytest.fixture
 def mock_get_stock_data(sample_stock_data):
     """
-    Mock get_stock_data function.
+    Context manager that patches the `get_stock_data` function to return predefined sample stock data during tests.
+    
+    Yields:
+        mock_func: The mocked `get_stock_data` function with its return value set to `sample_stock_data`.
     """
     with patch("app.sockets.websocket_server_manager.get_stock_data") as mock_func:
         mock_func.return_value = sample_stock_data
@@ -132,7 +153,7 @@ def mock_get_stock_data(sample_stock_data):
 
 def _cleanup_singletons():
     """
-    Helper function to clean up singleton instances.
+    Removes all singleton instances of RedisPubSubManager and ConnectionManager to ensure a clean test environment.
     """
     # Clear singleton instances to ensure clean test state
     if hasattr(RedisPubSubManager, "_instances"):
@@ -145,7 +166,10 @@ def _cleanup_singletons():
 @pytest.fixture(autouse=True)
 def clean_singletons():
     """
-    Automatically clean up singletons before each test.
+    Pytest fixture that ensures singleton instances are cleaned up before and after each test.
+    
+    Yields:
+        None. Used as a fixture to wrap test execution.
     """
     _cleanup_singletons()
     yield
@@ -154,7 +178,17 @@ def clean_singletons():
 
 async def mock_listen(messages, exception=asyncio.CancelledError):
     """
-    Mock listen function for simulating Redis PubSub message listening.
+    Simulates asynchronous listening to a sequence of messages, yielding each message and then raising an exception to terminate.
+    
+    Parameters:
+    	messages (Iterable): The sequence of messages to yield.
+    	exception (Exception, optional): The exception to raise after all messages are yielded. Defaults to asyncio.CancelledError.
+    
+    Yields:
+    	The next message from the provided sequence.
+    
+    Raises:
+    	The specified exception after all messages have been yielded.
     """
     for msg in messages:
         yield msg
@@ -165,7 +199,11 @@ async def mock_listen(messages, exception=asyncio.CancelledError):
 
 def verify_cleanup(channel, manager):
     """
-    Verify that all resources are cleaned up after a test.
+    Assert that all internal tracking for a given channel has been removed from the manager.
+    
+    Parameters:
+        channel (str): The channel name to verify cleanup for.
+        manager: The manager instance whose internal state is checked.
     """
     assert channel not in manager.subscribed_channels
     assert channel not in manager.tasks
@@ -179,7 +217,9 @@ def verify_cleanup(channel, manager):
 
 def test_manager_initialization_and_singleton(mock_redis, mock_pubsub_manager):
     """
-    Test both managers' initialization and singleton patterns.
+    Verify that RedisPubSubManager and ConnectionManager are properly initialized and enforce singleton behavior.
+    
+    Ensures that both managers return the same instance on repeated instantiation, are initialized with the correct dependencies, and have empty internal state dictionaries upon creation.
     """
     # Test RedisPubSubManager initialization and singleton
     pubsub_manager1 = RedisPubSubManager(mock_redis)
@@ -227,7 +267,9 @@ def test_redis_pubsub_manager_initialization(mock_redis):
 @pytest.mark.asyncio
 async def test_subscribe_success(mock_redis, mock_logger):
     """
-    Test successful subscription to a Redis channel.
+    Test that subscribing to a Redis channel succeeds and updates the manager's internal state.
+    
+    Verifies that the channel is added to the subscribed channels, the callback and activity time are recorded, a listening task is started, and a log entry is created.
     """
     manager = RedisPubSubManager(mock_redis)
     callback = AsyncMock()
@@ -251,7 +293,9 @@ async def test_subscribe_success(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_subscribe_invalid_channel(mock_redis):
     """
-    Test subscription with invalid channel names.
+    Verify that subscribing with invalid channel names raises a ValueError.
+    
+    Tests that the RedisPubSubManager.subscribe method raises a ValueError when provided with an empty string, None, or a non-string as the channel name.
     """
     manager = RedisPubSubManager(mock_redis)
     callback = AsyncMock()
@@ -272,7 +316,7 @@ async def test_subscribe_invalid_channel(mock_redis):
 @pytest.mark.asyncio
 async def test_subscribe_already_subscribed(mock_redis, mock_logger):
     """
-    Test subscribing to an already subscribed channel.
+    Verify that subscribing to a channel already subscribed to returns False and logs the appropriate debug message.
     """
     manager = RedisPubSubManager(mock_redis)
     callback = AsyncMock()
@@ -292,7 +336,7 @@ async def test_subscribe_already_subscribed(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_unsubscribe_success(mock_redis, mock_logger):
     """
-    Test successful unsubscription from a Redis channel.
+    Test that unsubscribing from a Redis channel succeeds, cancels the listening task, and cleans up resources.
     """
     manager = RedisPubSubManager(mock_redis)
 
@@ -320,7 +364,7 @@ async def test_unsubscribe_success(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_unsubscribe_not_subscribed(mock_redis, mock_logger):
     """
-    Test unsubscribing from a channel that wasn't subscribed.
+    Test that unsubscribing from a channel that was never subscribed returns False and logs the appropriate debug message.
     """
     manager = RedisPubSubManager(mock_redis)
 
@@ -335,7 +379,7 @@ async def test_unsubscribe_not_subscribed(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_unsubscribe_with_task_timeout(mock_redis, mock_logger):
     """
-    Test unsubscription when task cancellation times out.
+    Test that unsubscribing from a channel handles task cancellation timeouts by logging a warning and cleaning up the subscription.
     """
     manager = RedisPubSubManager(mock_redis)
 
@@ -366,7 +410,9 @@ async def test_unsubscribe_with_task_timeout(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_listen_channel_scenarios(mock_redis, mock_logger):
     """
-    Test various channel listening scenarios including success, callback errors, and cleanup.
+    Test the behavior of the channel listening logic, including successful message handling, callback exceptions, and resource cleanup.
+    
+    Simulates a sequence of messages received from a Redis channel, verifies that the callback is invoked for each message, ensures errors in the callback are logged but do not interrupt processing, and checks that unsubscribe and close are called during cleanup.
     """
     manager = RedisPubSubManager(mock_redis)
 
@@ -414,7 +460,9 @@ async def test_listen_channel_scenarios(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_listen_channel_general_error_and_cleanup(mock_redis, mock_logger):
     """
-    Test channel listening with general exceptions and cleanup errors.
+    Test that _listen_channel handles general exceptions during message listening and logs errors for both the exception and any cleanup failures.
+    
+    Verifies that the channel is unsubscribed and the pubsub connection is closed after an error, and that cleanup errors are also logged.
     """
     manager = RedisPubSubManager(mock_redis)
 
@@ -444,6 +492,9 @@ async def test_listen_channel_general_error_and_cleanup(mock_redis, mock_logger)
     mock_logger.reset_mock()
 
     async def mock_listen_empty():
+        """
+        Asynchronous mock listener that immediately returns without yielding any messages.
+        """
         return
         yield  # This line will never be reached
 
@@ -461,7 +512,9 @@ async def test_listen_channel_general_error_and_cleanup(mock_redis, mock_logger)
 
 def test_handle_task_done_scenarios(mock_redis, mock_logger):
     """
-    Test various task completion scenarios including normal, cancelled, exception, and different task.
+    Test the RedisPubSubManager's _handle_task_done method for normal completion, cancellation, exception, and mismatched task scenarios.
+    
+    Verifies that resources are cleaned up or retained appropriately and that logging occurs as expected for each case.
     """
     manager = RedisPubSubManager(mock_redis)
 
@@ -524,7 +577,9 @@ def test_handle_task_done_scenarios(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_close_pubsub_manager(mock_redis):
     """
-    Test closing the RedisPubSubManager.
+    Verify that closing the RedisPubSubManager unsubscribes from all active channels.
+    
+    Ensures that the `close` method calls `unsubscribe` for each subscribed channel, cleaning up all subscriptions.
     """
     manager = RedisPubSubManager(mock_redis)
 
@@ -550,7 +605,7 @@ async def test_close_pubsub_manager(mock_redis):
 
 def test_get_client_id(mock_pubsub_manager, mock_websocket_client):
     """
-    Test client ID generation.
+    Test that the ConnectionManager correctly retrieves the client ID from a WebSocket client.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
 
@@ -563,7 +618,9 @@ def test_get_client_id(mock_pubsub_manager, mock_websocket_client):
 @pytest.mark.asyncio
 async def test_connect_client(mock_pubsub_manager, mock_websocket_client, mock_logger):
     """
-    Test successful client connection.
+    Test that a client is successfully connected and tracked by the ConnectionManager.
+    
+    Verifies that the client is added to active connections, an empty subscription set is initialized, and a connection log entry is made.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
 
@@ -583,7 +640,7 @@ async def test_disconnect_client_with_subscriptions(
     mock_pubsub_manager, mock_websocket_client, mock_logger
 ):
     """
-    Test client disconnection with active subscriptions.
+    Test that disconnecting a client with active subscriptions removes the client from all relevant data structures, unsubscribes from Redis channels with no remaining subscribers, and logs the cleanup actions.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     client_id = mock_websocket_client.peer
@@ -622,7 +679,9 @@ async def test_disconnect_unknown_client(
     mock_pubsub_manager, mock_websocket_client, mock_logger
 ):
     """
-    Test disconnecting a client that wasn't connected.
+    Test that disconnecting a client not present in the active connections logs a warning.
+    
+    Verifies that attempting to disconnect an unknown client triggers the appropriate warning message.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
 
@@ -636,7 +695,7 @@ async def test_disconnect_unknown_client(
 @pytest.mark.asyncio
 async def test_redis_callback_success(mock_pubsub_manager, sample_stock_data):
     """
-    Test successful Redis callback message processing.
+    Test that the ConnectionManager's redis_callback method correctly processes a valid Redis message and broadcasts it to subscribers.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
 
@@ -655,7 +714,7 @@ async def test_redis_callback_success(mock_pubsub_manager, sample_stock_data):
 @pytest.mark.asyncio
 async def test_redis_callback_json_error(mock_pubsub_manager, mock_logger):
     """
-    Test Redis callback with JSON decode error.
+    Test that the Redis callback logs an error when it receives an invalid JSON message.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
 
@@ -677,7 +736,7 @@ async def test_handle_subscribe_success(
     mock_get_stock_data,
 ):
     """
-    Test successful stock subscription.
+    Test that a client can successfully subscribe to a stock, triggering Redis subscription, updating internal subscription state, and sending acknowledgment and stock data messages to the client.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     await conn_manager.connect(mock_websocket_client)
@@ -717,7 +776,9 @@ async def test_handle_subscribe_empty_token(
     mock_pubsub_manager, mock_websocket_client, mock_logger
 ):
     """
-    Test subscription with empty stock token.
+    Test that subscribing with an empty stock token results in an error message and a warning log.
+    
+    Verifies that the ConnectionManager sends an error response to the client and logs a warning when an empty token is provided during subscription.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     await conn_manager.connect(mock_websocket_client)
@@ -740,7 +801,9 @@ async def test_handle_subscribe_existing_subscription(
     mock_pubsub_manager, mock_websocket_client
 ):
     """
-    Test subscribing to a stock that already has subscribers.
+    Test that subscribing to a stock with existing subscribers adds the client to the subscription without triggering a new Redis subscription.
+    
+    Verifies that the RedisPubSubManager does not attempt to subscribe again and that the client is correctly added to the set of subscribers for the stock.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     await conn_manager.connect(mock_websocket_client)
@@ -764,7 +827,7 @@ async def test_handle_subscribe_no_stock_data(
     mock_pubsub_manager, mock_websocket_client, mock_get_stock_data
 ):
     """
-    Test subscription when no stock data is available.
+    Test that subscribing to a stock with no available data sends an appropriate 'no data' message to the client.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     await conn_manager.connect(mock_websocket_client)
@@ -792,7 +855,9 @@ async def test_handle_unsubscribe_success(
     mock_pubsub_manager, mock_websocket_client, mock_logger
 ):
     """
-    Test successful stock unsubscription.
+    Test that a client can successfully unsubscribe from a stock channel.
+    
+    Verifies that the client's subscription is removed, the Redis unsubscription is triggered, an acknowledgment message is sent to the client, and the appropriate log entry is created.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     await conn_manager.connect(mock_websocket_client)
@@ -829,7 +894,9 @@ async def test_handle_unsubscribe_with_other_clients(
     mock_pubsub_manager, mock_websocket_client
 ):
     """
-    Test unsubscription when other clients are still subscribed.
+    Test that unsubscribing a client from a channel does not remove the channel subscription if other clients remain subscribed.
+    
+    Verifies that the unsubscribed client is removed from the channel's subscriber list, the channel remains active for other clients, and no Redis unsubscription occurs.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     await conn_manager.connect(mock_websocket_client)
@@ -856,7 +923,7 @@ async def test_handle_unsubscribe_empty_token(
     mock_pubsub_manager, mock_websocket_client, mock_logger
 ):
     """
-    Test unsubscription with empty stock token.
+    Test that unsubscribing with an empty stock token logs a warning and sends an error message to the client.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     await conn_manager.connect(mock_websocket_client)
@@ -879,7 +946,9 @@ async def test_send_personal_message_success(
     mock_pubsub_manager, mock_websocket_client
 ):
     """
-    Test successful personal message sending.
+    Test that ConnectionManager successfully sends a personal message to a WebSocket client.
+    
+    Verifies that the message is correctly JSON-encoded and sent using the client's sendMessage method.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     message = {"type": "test", "data": "test_data"}
@@ -897,7 +966,7 @@ async def test_send_personal_message_error(
     mock_pubsub_manager, mock_websocket_client, mock_logger
 ):
     """
-    Test personal message sending with error.
+    Test that sending a personal message logs an error when the WebSocket client's sendMessage method raises an exception.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
     message = {"type": "test", "data": "test_data"}
@@ -919,7 +988,9 @@ async def test_broadcast_to_subscribers_scenarios(
     mock_pubsub_manager, sample_stock_data, mock_logger
 ):
     """
-    Test broadcasting scenarios including success, disconnected clients, send errors, and no subscribers.
+    Test various scenarios for broadcasting messages to subscribers, including successful delivery, handling disconnected clients, send errors, and cases with no subscribers.
+    
+    Verifies that messages are sent to all active subscribers, disconnected clients are cleaned up, send errors are logged and result in cleanup, and that Redis unsubscription occurs when the last subscriber is removed.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
 
@@ -987,7 +1058,7 @@ async def test_broadcast_to_subscribers_scenarios(
 @pytest.mark.asyncio
 async def test_close_connection_manager(mock_pubsub_manager):
     """
-    Test closing the ConnectionManager.
+    Test that ConnectionManager.close() sends a close message to all clients, closes their connections, and clears all internal data structures.
     """
     conn_manager = ConnectionManager(mock_pubsub_manager)
 
@@ -1036,7 +1107,9 @@ async def test_end_to_end_subscription_flow(
     sample_stock_data,
 ):
     """
-    Test complete end-to-end subscription and message flow.
+    Tests the full subscription and message delivery flow from client subscription to receiving messages.
+    
+    Simulates a client connecting, subscribing to a stock channel, and verifies that subscription acknowledgments and initial data are sent, and that Redis channel subscription is established.
     """
     # Set up managers
     pubsub_manager = RedisPubSubManager(mock_redis)
@@ -1077,7 +1150,9 @@ async def test_multiple_clients_same_stock(
     mock_redis, sample_stock_data, mock_get_stock_data
 ):
     """
-    Test multiple clients subscribing to the same stock.
+    Test that multiple clients can subscribe to the same stock and all receive broadcast messages.
+    
+    Verifies that each client receives initial stock data upon subscribing, all clients are tracked in the subscription list, and broadcasted updates are delivered to every subscribed client.
     """
     pubsub_manager = RedisPubSubManager(mock_redis)
     conn_manager = ConnectionManager(pubsub_manager)
@@ -1119,7 +1194,9 @@ async def test_multiple_clients_same_stock(
 @pytest.mark.asyncio
 async def test_client_disconnect_during_operation(mock_redis, mock_get_stock_data):
     """
-    Test client disconnection during active operations.
+    Test that client disconnection during active subscriptions correctly updates subscription state and cleans up resources.
+    
+    Simulates two clients subscribing to the same stock, disconnecting one client while the other remains subscribed, and then disconnecting the second client. Verifies that subscriptions and Redis resources are maintained or cleaned up appropriately after each disconnection, and that stock data retrieval is called for each subscription.
     """
 
     pubsub_manager = RedisPubSubManager(mock_redis)
@@ -1184,7 +1261,7 @@ async def test_client_disconnect_during_operation(mock_redis, mock_get_stock_dat
 @pytest.mark.asyncio
 async def test_redis_connection_error_handling(mock_redis, mock_logger):
     """
-    Test handling of Redis connection errors.
+    Test that RedisPubSubManager raises RedisPubSubError and logs an error when a Redis connection failure occurs during subscription.
     """
     pubsub_manager = RedisPubSubManager(mock_redis)
 
@@ -1204,7 +1281,9 @@ async def test_redis_connection_error_handling(mock_redis, mock_logger):
 @pytest.mark.asyncio
 async def test_error_recovery_and_resilience(mock_redis, mock_logger):
     """
-    Test system resilience and error recovery.
+    Test that the system continues processing messages and logs errors when the callback intermittently fails during Redis channel listening.
+    
+    Verifies that exceptions raised by the callback do not interrupt message processing and that errors are properly logged.
     """
     pubsub_manager = RedisPubSubManager(mock_redis)
 
@@ -1212,6 +1291,12 @@ async def test_error_recovery_and_resilience(mock_redis, mock_logger):
     call_count = 0
 
     async def failing_callback(_, message):
+        """
+        A callback function that processes messages and raises an error on every even call.
+        
+        Raises:
+            ValueError: If the callback is called an even number of times.
+        """
         nonlocal call_count
         call_count += 1
         if call_count % 2 == 0:  # Fail on even calls
@@ -1253,7 +1338,9 @@ async def test_edge_cases_and_unicode_handling(
     mock_redis, mock_pubsub_manager, mock_websocket_client
 ):
     """
-    Test edge cases including empty messages and Unicode character handling.
+    Test handling of edge cases such as empty messages and Unicode characters in message processing.
+    
+    Verifies that callbacks are invoked correctly for empty and None message data, ignores non-message types, and ensures Unicode and special characters are properly encoded and decoded when sending messages to clients.
     """
     # Test empty message handling
     pubsub_manager = RedisPubSubManager(mock_redis)

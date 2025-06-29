@@ -47,6 +47,14 @@ class KafkaProducer(Producer):
         kafka_topic: str,
         config: Optional[Dict[str, Any]] = None,
     ):
+        """
+        Initialize a KafkaProducer instance with the specified Kafka server, topic, and optional configuration.
+        
+        Parameters:
+            kafka_server (str): Address of the Kafka broker(s) to connect to.
+            kafka_topic (str): Name of the Kafka topic to publish messages to.
+            config (Optional[Dict[str, Any]]): Optional dictionary of additional Kafka producer configuration settings.
+        """
         self.kafka_topic = kafka_topic
 
         # Merge default config with user-provided config
@@ -65,20 +73,9 @@ class KafkaProducer(Producer):
 
     def delivery_report(self, err: KafkaError | None, msg: Message) -> None:
         """
-        Process delivery reports for sent messages.
-
-        Callback function that is called by the Kafka producer when the delivery
-        status of a message is known. Updates success/failure statistics and
-        logs delivery status information.
-
-        Parameters
-        ----------
-        err: ``KafkaError | None``
-            The error object if the message delivery failed, or None if the
-            message was successfully delivered
-        msg: ``Message``
-            The message object that was delivered or failed, containing
-            information about the topic, partition, and payload
+        Handles Kafka message delivery reports, updating internal success and failure counters and logging delivery outcomes.
+        
+        Called by the Kafka producer when a message is delivered or fails delivery. Periodically logs aggregate delivery statistics.
         """
         if err is not None:
             self._delivery_failure_count += 1
@@ -105,23 +102,15 @@ class KafkaProducer(Producer):
 
     def __call__(self, data: str) -> bool:
         """
-        Send data to the configured Kafka topic.
-
-        Encodes the input string as UTF-8 and sends it to the Kafka topic.
-        Automatically manages the producer's message queue and implements
-        flow control by flushing when necessary.
-
-        Parameters
-        ----------
-        data: ``str``
-            The data to send to Kafka as a string, typically a JSON-serialized
-            object or other string-encoded message format
-
-        Returns
-        -------
-        ``bool``
-            True if the message was successfully queued for sending,
-            False if there was an error or if the producer queue is full
+        Attempts to send a UTF-8 encoded string message to the configured Kafka topic.
+        
+        If the producer's internal queue is full, attempts to flush pending messages before retrying. Returns True if the message was successfully queued for delivery, or False if the input is empty, the queue remains full, or an error occurs.
+        
+        Parameters:
+            data (str): The message to send, typically a JSON-encoded string.
+        
+        Returns:
+            bool: True if the message was queued for delivery, False otherwise.
         """
         if not data:
             logger.warning("Attempted to send empty data to Kafka")
@@ -167,11 +156,9 @@ class KafkaProducer(Producer):
 
     def close(self) -> None:
         """
-        Flush and close the Kafka producer.
-
-        Ensures all pending messages are delivered by flushing the producer queue
-        and logs delivery statistics before shutting down the producer. This method
-        should be called during application shutdown to ensure clean resource release.
+        Flushes the Kafka producer queue to ensure all pending messages are delivered before shutdown.
+        
+        Logs any undelivered messages and final delivery statistics. Intended to be called during application shutdown for clean resource release.
         """
         if self.kafka_producer:
             try:
@@ -200,25 +187,15 @@ class KafkaProducer(Producer):
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["KafkaProducer"]:
         """
-        Create a KafkaProducer instance from configuration.
-
-        Factory method that instantiates and configures a KafkaProducer
-        using parameters defined in a configuration object.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing Kafka settings including:
-            - kafka_server: The broker URL(s)
-            - kafka_topic: The topic to produce to
-            - producer_config: Optional additional configuration parameters
-
-        Returns
-        -------
-        producer: ``Optional[KafkaProducer]``
-            A configured KafkaProducer instance if the configuration is valid,
-            or None if required configuration is missing or invalid
-
+        Instantiate a KafkaProducer from an OmegaConf configuration object.
+        
+        Creates and returns a KafkaProducer instance using configuration values for Kafka server, topic, and optional producer settings. Returns None if required configuration fields are missing or invalid.
+        
+        Parameters:
+            cfg (DictConfig): Configuration object containing 'kafka_server', 'kafka_topic', and optionally 'producer_config'.
+        
+        Returns:
+            Optional[KafkaProducer]: Configured KafkaProducer instance, or None if configuration is invalid.
         """
         try:
             # Convert OmegaConf to dict

@@ -22,21 +22,18 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
 
     def onOpen(self):
         """
-        Called when the WebSocket connection is opened.
+        Handles initialization when a WebSocket connection is established.
+        
+        Notifies the connection manager of the new connection.
         """
         logger.info("WebSocket connection open: %s", self.peer)
         fire_and_forgot(self.connection_manager.connect(self))
 
     def handle_message(self, message: str | bytes):
         """
-        Handle incoming messages from the client. This method is called when a message is received
-        from the client. It decodes the message, parses it as JSON, and processes the action. The
-        action can be either "subscribe" or "unsubscribe" for stock tokens.
-
-        Parameters
-        ----------
-        message : ``str | bytes``
-            The message received from the client
+        Processes a client message to subscribe or unsubscribe from stock tokens.
+        
+        Decodes and parses the incoming message, determines the requested action, and updates stock subscriptions accordingly. Sends an error message to the client if the action is invalid or required data is missing.
         """
 
         if isinstance(message, bytes):
@@ -73,15 +70,9 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
 
     def onMessage(self, payload: str | bytes, isBinary: bool):
         """
-        Called when a message is received from the client. This method is responsible for handling
-        incoming messages. It decodes the message, parses it as JSON, and processes the action.
-
-        Parameters
-        ----------
-        payload : ``str | bytes``
-            The message received from the client
-        isBinary : ``bool``
-            Indicates whether the message is binary or text
+        Handles incoming text messages from the client, processing JSON commands for subscription management.
+        
+        Ignores binary messages. On receiving a text message, attempts to parse it as JSON and process the requested action. If the message is not valid JSON, or if an error occurs during processing, sends an appropriate error message back to the client.
         """
         if isBinary:
             logger.warning("Received binary message from %s, ignoring.", self.peer)
@@ -111,17 +102,9 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
 
     def onClose(self, wasClean: bool, code: int, reason: str):
         """
-        Called when the WebSocket connection is closed. This method is responsible for handling
-        cleanup and logging the disconnection details.
-
-        Parameters
-        ----------
-        wasClean : ``bool``
-            Indicates whether the connection was closed cleanly
-        code : ``int``
-            The status code indicating the reason for closure
-        reason : ``str``
-            The reason for closure from the client
+        Handle cleanup and notify the connection manager when the WebSocket connection is closed.
+        
+        This method logs the closure details and asynchronously informs the connection manager to disconnect the client.
         """
         logger.info(
             "WebSocket connection closed: %s (Clean: %s, Code: %d, Reason: '%s')",
@@ -148,6 +131,12 @@ class StockTickerServerFactory(WebSocketServerFactory):
     protocol = StockTickerServerProtocol
 
     def __init__(self, url, connection_manager: ConnectionManager):
+        """
+        Initialize the WebSocket server factory with a URL and a connection manager.
+        
+        Raises:
+            ValueError: If the connection manager is None.
+        """
         super().__init__(url)
 
         self.connection_manager = connection_manager
@@ -164,18 +153,10 @@ class StockTickerServerFactory(WebSocketServerFactory):
 
     def buildProtocol(self, addr):
         """
-        Build a protocol instance for the given address. This method is called when a new WebSocket
-        connection is established. It initializes the protocol with the connection manager.
-
-        Parameters
-        ----------
-        addr : ``str``
-            The address of the client connecting to the server
-
-        Returns
-        -------
-        protocol : ``StockTickerServerProtocol``
-            An instance of the StockTickerServerProtocol class
+        Creates and initializes a StockTickerServerProtocol instance for a new WebSocket connection.
+        
+        Returns:
+            StockTickerServerProtocol: The protocol instance associated with the new client connection.
         """
         logger.debug("Building protocol for address: %s", addr)
         protocol = super().buildProtocol(addr)

@@ -20,16 +20,9 @@ logger = get_logger(Path(__file__).name)
 
 def set_key_with_expiry(key: str, value: str, client: Redis) -> None:
     """
-    Store a key-value pair in Redis with an expiry time set to 3:30 PM of the current or next day
-
-    Parameters
-    ----------
-    key: ``str``
-        The key to store in Redis
-    value: ``str``
-        The value to associate with the key
-    client: ``Redis``
-        The Redis client to use for storing the key-value pair
+    Store a key-value pair in Redis with an expiration set to 3:30 PM of the current or next day.
+    
+    The key will expire at 3:30 PM today if the current time is before 3:30 PM, or at 3:30 PM tomorrow if the current time is after 3:30 PM.
     """
     now = datetime.now()
     expiry_time = now.replace(
@@ -49,19 +42,10 @@ def set_key_with_expiry(key: str, value: str, client: Redis) -> None:
 
 def get_and_validate_key(key: str, client: Redis) -> str | None:
     """
-    Retrieve and validate a key from Redis
-
-    Parameters
-    ----------
-    key: ``str``
-        The key to retrieve from Redis
-    client: ``Redis``
-        The Redis client to use for retrieving the key
-
-    Returns
-    -------
-    value: ``str | None``
-        The value associated with the key if it exists and is valid, otherwise None
+    Retrieves a value from Redis by key and checks its validity based on existence and expiration.
+    
+    Returns:
+        The value associated with the key if it exists and is not expired; otherwise, None.
     """
     value = cast(str | None, client.get(key))
 
@@ -225,12 +209,15 @@ class UplinkCredentials(Credentials):
     @classmethod
     def get_credentials(cls) -> "UplinkCredentials":
         """
-        Create a Credentials object with the API key
-
-        Returns
-        -------
-        ``UplinkCredentials``
-            The credentials object with the access token
+        Retrieves valid Uplink API credentials, using a cached access token if available or performing authentication if necessary.
+        
+        If a valid access token is cached in Redis, it is returned. Otherwise, the method reads required environment variables, automates the login process to obtain an authorization code, exchanges it for an access token, caches the token with an appropriate expiry, and returns a credentials object containing the new token.
+        
+        Returns:
+            UplinkCredentials: An instance containing the valid Uplink API access token.
+        
+        Raises:
+            ValueError: If the authorization code cannot be obtained during authentication.
         """
         connection = RedisSyncConnection()
         client = connection.get_connection()

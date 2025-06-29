@@ -49,8 +49,10 @@ from app.utils.constants import SERVICE_NAME
 @pytest.fixture
 def mock_logger():
     """
-    Mock logger fixture for testing log output. Provides a mock logger to verify logging
-    behavior throughout the test suite.
+    Provides a mock logger fixture for verifying logging behavior in tests.
+    
+    Yields:
+        A mock object that replaces the application's logger during the test.
     """
     with patch("app.core.application.logger") as mock:
         yield mock
@@ -59,8 +61,10 @@ def mock_logger():
 @pytest.fixture
 def mock_app_state():
     """
-    Mock AppState fixture for testing application state management. Provides a mock AppState
-    to isolate application state during testing.
+    Provides a fixture that mocks the AppState class attributes for isolated application state management during tests.
+    
+    Yields:
+        AppState: The AppState class with its key attributes set to test defaults, restoring original values after the test completes.
     """
     # Store original values
     original_redis_client = None
@@ -109,8 +113,9 @@ def mock_app_state():
 @pytest.fixture(autouse=True)
 def mock_env_vars():
     """
-    Mock environment variables for testing. Provides consistent environment variable
-    values for testing.
+    Yields a patched environment variable getter that returns predefined values for testing.
+    
+    This fixture ensures consistent environment variable values during tests by mocking the application's environment variable retrieval function.
     """
     env_vars = {
         "CORS_ORIGINS": "http://localhost:3000,http://localhost:8080",
@@ -128,7 +133,10 @@ def mock_env_vars():
 
 def _create_mock_redis_client():
     """
-    Helper function to create consistent mock Redis client.
+    Create a mock Redis client with async methods for testing purposes.
+    
+    Returns:
+        AsyncMock: A mock Redis client with async `ping`, `publish`, `close`, and `flushdb` methods.
     """
     mock_client = AsyncMock()
     mock_client.ping = AsyncMock(return_value=True)
@@ -142,8 +150,10 @@ def _create_mock_redis_client():
 @pytest.fixture
 def mock_redis_connection():
     """
-    Mock Redis connection fixture for testing Redis integration. Provides a mock Redis
-    connection and client for isolated testing.
+    Fixture that provides a mocked Redis connection and client for use in tests.
+    
+    Yields:
+        dict: A dictionary containing the mock Redis client and the mocked Redis connection instance.
     """
     mock_redis_client = _create_mock_redis_client()
 
@@ -158,13 +168,15 @@ def mock_redis_connection():
 @pytest.fixture
 def mock_kafka_consumer():
     """
-    Mock Kafka consumer fixture for testing Kafka integration. Provides a mock KafkaConsumer
-    for isolated testing.
+    Fixture that provides a mock KafkaConsumer for testing Kafka integration.
+    
+    Yields:
+        dict: A dictionary containing the mocked KafkaConsumer class and its instance, with an async `consume_messages` method.
     """
 
     async def mock_consume_messages():
         """
-        Mock async function that doesn't create unawaited coroutines.
+        A mock asynchronous function for simulating message consumption without creating unawaited coroutines.
         """
 
     with patch("app.core.application.KafkaConsumer") as mock_consumer_class:
@@ -178,8 +190,10 @@ def mock_kafka_consumer():
 @pytest.fixture
 def mock_twisted_components():
     """
-    Mock Twisted components fixture for testing WebSocket server integration. Provides mock
-    Twisted reactor and related components.
+    Yields mocked Twisted reactor and TCP port objects for testing WebSocket server integration.
+    
+    Returns:
+        dict: Contains the mocked 'reactor' and 'port' objects used in place of actual Twisted components.
     """
     mock_reactor = MagicMock()
     mock_reactor.listenTCP = MagicMock()
@@ -201,8 +215,10 @@ def mock_external_dependencies(
     mock_app_state,
 ):
     """
-    Combined fixture that mocks all external dependencies. Provides a comprehensive mock
-    setup for testing application functionality without external service dependencies.
+    Fixture that mocks all external dependencies required by the application, including database creation, rate limiter, background task execution, shutdown handlers, Redis, Kafka, and application state. Enables isolated testing of application logic without connecting to real external services.
+    
+    Yields:
+        dict: A dictionary containing the mocked dependencies for use in tests.
     """
     with patch("app.core.application.create_tokens_db") as mock_create_db:
         with patch("app.core.application.FastAPILimiter") as mock_limiter:
@@ -219,6 +235,15 @@ def mock_external_dependencies(
                         # fire_and_forgot should consume the coroutine to prevent warnings
                         def mock_fire_and_forgot_func(coro):
                             # Close the coroutine to prevent RuntimeWarning
+                            """
+                            Mocks a fire-and-forget asynchronous task executor by closing the coroutine and returning a mock Task object.
+                            
+                            Parameters:
+                                coro: The coroutine to be closed.
+                            
+                            Returns:
+                                A mock Task object with `done` and `cancel` methods.
+                            """
                             if hasattr(coro, "close"):
                                 coro.close()
 
@@ -250,9 +275,7 @@ def mock_external_dependencies(
 
 def test_fastapi_app_singleton_behavior():
     """
-    Test that FastAPIApp follows singleton pattern. Verifies that multiple calls to
-    get_fast_api_app() return the same instance and that the singleton pattern is
-    properly implemented.
+    Verify that FastAPIApp implements the singleton pattern by ensuring multiple calls to get_fast_api_app() return the same FastAPI instance.
     """
     # Clear any existing app instance
     FastAPIApp._app = None
@@ -273,8 +296,9 @@ def test_fastapi_app_singleton_behavior():
 
 def test_fastapi_app_initialization_with_defaults():
     """
-    Test FastAPI app initialization with default configuration. Verifies that the FastAPI
-    application is properly initialized with correct title, description, and version.
+    Test that the FastAPI application initializes with the default title, description, and version.
+    
+    Verifies that the FastAPI app instance uses the expected default metadata when created.
     """
     # Clear any existing app instance
     FastAPIApp._app = None
@@ -296,8 +320,7 @@ def test_fastapi_app_initialization_with_defaults():
 
 def test_fastapi_app_cors_middleware_configuration():
     """
-    Test CORS middleware configuration. Verifies that CORS middleware is properly configured
-    with correct origins and settings from environment variables, including wildcard origins.
+    Tests that the FastAPI application's CORS middleware is configured with the correct origins and settings based on environment variables, including support for wildcard origins.
     """
     # Clear any existing app instance
     FastAPIApp._app = None
@@ -346,8 +369,7 @@ def test_fastapi_app_cors_middleware_configuration():
 
 def test_module_level_app_instance():
     """
-    Test that the module-level app instance is correctly created. Verifies that the app variable
-    at module level is a FastAPI instance created through the singleton pattern.
+    Verify that the module-level `app` variable is a FastAPI instance with non-null title and version.
     """
     assert isinstance(app, FastAPI)
     assert app.title is not None
@@ -373,9 +395,7 @@ def test_app_exception_handler_registration():
 @pytest.mark.asyncio
 async def test_global_exception_handler_comprehensive(mock_logger):
     """
-    Test global exception handler with different exception types and scenarios.
-    Verifies that the handler works correctly with various exception types and
-    returns proper JSON response format.
+    Tests the global exception handler with multiple exception types to ensure it returns a standardized 500 JSON response and logs the exception details.
     """
     mock_request = MagicMock(spec=Request)
     mock_request.url = "http://localhost:8000/test"
@@ -415,8 +435,9 @@ async def test_startup_event_successful_initialization(
     mock_logger,
 ):
     """
-    Test successful startup event execution. Verifies that all services are properly
-    initialized during startup and that the startup completes successfully.
+    Test that the application startup event initializes all core services and completes successfully.
+    
+    Verifies that the database, Redis, rate limiter, Kafka consumer, and WebSocket server are properly initialized, the startup completion flag is set, and appropriate log messages are generated.
     """
     deps = mock_external_dependencies
 
@@ -461,8 +482,7 @@ async def test_startup_event_successful_initialization(
 @pytest.mark.asyncio
 async def test_startup_event_without_twisted(mock_external_dependencies, mock_logger):
     """
-    Test startup event when Twisted is not available. Verifies that startup continues
-    successfully even when Twisted is not available for WebSocket server.
+    Tests that the application startup event completes successfully when Twisted is unavailable, ensuring all other services initialize and a warning is logged about the missing WebSocket server.
     """
     deps = mock_external_dependencies
 
@@ -490,8 +510,9 @@ async def test_startup_event_websocket_port_conflict(
     mock_logger,
 ):
     """
-    Test startup event with WebSocket port conflict. Verifies that startup handles WebSocket
-    port conflicts gracefully.
+    Test that the application startup event handles a WebSocket port conflict by logging an error and not starting the WebSocket server.
+    
+    This test simulates a scenario where the WebSocket server is configured to use the same port as the FastAPI application, causing a conflict. It verifies that the application logs the appropriate error and does not mark the WebSocket server as running.
     """
     deps = mock_external_dependencies
 
@@ -499,6 +520,16 @@ async def test_startup_event_websocket_port_conflict(
     with patch("app.core.application.get_env_var") as mock_get_env:
 
         def mock_env_side_effect(key, default=None):
+            """
+            Simulates retrieval of environment variables for WebSocket configuration, returning mock values for host and port.
+            
+            Parameters:
+            	key (str): The name of the environment variable to retrieve.
+            	default: The value to return if the key does not match a mocked variable.
+            
+            Returns:
+            	The mocked value for "WEBSOCKET_PORT" or "WEBSOCKET_HOST", or the provided default for other keys.
+            """
             if key == "WEBSOCKET_PORT":
                 return "8000"
             if key == "WEBSOCKET_HOST":
@@ -523,8 +554,9 @@ async def test_startup_event_websocket_port_conflict(
 @pytest.mark.asyncio
 async def test_startup_event_critical_failures(mock_external_dependencies, mock_logger):
     """
-    Test startup event with critical service failures that should cause system exit.
-    Tests Redis connection, database initialization, and Kafka consumer failures.
+    Test that the application startup event triggers a system exit on critical service failures.
+    
+    Simulates failures in Redis connection, database initialization, and Kafka consumer startup, verifying that each causes a critical log entry and exits the process with code 1.
     """
     deps = mock_external_dependencies
 
@@ -583,8 +615,9 @@ async def test_shutdown_event_successful_cleanup(
     mock_external_dependencies, mock_logger, mock_twisted_components
 ):
     """
-    Test successful shutdown event execution. Verifies that all resources are properly cleaned
-    up during shutdown and that the shutdown completes successfully.
+    Test that the shutdown event properly cleans up all resources when shutdown is successful.
+    
+    Verifies that the WebSocket server is stopped, the Kafka consumer task is cleaned up without cancellation if already complete, and the application state is updated accordingly.
     """
     deps = mock_external_dependencies
     twisted = mock_twisted_components
@@ -596,6 +629,9 @@ async def test_shutdown_event_successful_cleanup(
 
     # Mock Kafka consumer task that completes successfully
     async def successful_task():
+        """
+        A coroutine that completes successfully without performing any actions.
+        """
         pass  # Completes successfully
 
     # Create a real task that will complete successfully when awaited
@@ -638,8 +674,9 @@ async def test_shutdown_event_before_startup_complete(
     mock_external_dependencies, mock_logger
 ):
     """
-    Test shutdown event called before startup completion. Verifies that shutdown handles cases
-    where it's called before startup has completed.
+    Test that the shutdown event handles being called before the application's startup is complete.
+    
+    Verifies that no cleanup actions are performed and an informational log is recorded when shutdown is triggered prior to startup completion.
     """
     deps = mock_external_dependencies
     deps["app_state"].startup_complete = False
@@ -655,8 +692,9 @@ async def test_shutdown_event_timeout_scenarios(
     mock_external_dependencies, mock_logger, mock_twisted_components
 ):
     """
-    Test shutdown event with timeout scenarios for WebSocket server and Kafka consumer.
-    Verifies that timeouts are handled gracefully with appropriate warnings.
+    Test that the shutdown event handles timeouts when stopping the WebSocket server and Kafka consumer.
+    
+    Verifies that if stopping the WebSocket server or Kafka consumer exceeds the allowed timeout, appropriate warnings are logged and the shutdown process continues gracefully.
     """
     deps = mock_external_dependencies
     twisted = mock_twisted_components
@@ -667,6 +705,9 @@ async def test_shutdown_event_timeout_scenarios(
     deps["app_state"].websocket_server_running = True
 
     async def timeout_deferred():
+        """
+        Asynchronously sleeps for 10 seconds, simulating a long-running operation.
+        """
         await asyncio.sleep(10)  # Longer than timeout
 
     twisted["port"].stopListening.return_value = timeout_deferred()
@@ -684,6 +725,11 @@ async def test_shutdown_event_timeout_scenarios(
 
     # Test Kafka consumer timeout
     async def timeout_task():
+        """
+        Asynchronous task that sleeps for 100 seconds.
+        
+        Intended for use in testing timeout scenarios.
+        """
         await asyncio.sleep(100)  # Longer than timeout
 
     mock_kafka_task = asyncio.create_task(timeout_task())
@@ -703,8 +749,9 @@ async def test_shutdown_event_error_scenarios(
     mock_external_dependencies, mock_logger, mock_twisted_components
 ):
     """
-    Test shutdown event with various error scenarios including WebSocket server errors
-    and Kafka consumer errors. Verifies graceful error handling during shutdown.
+    Test the application's shutdown event handling when errors occur during WebSocket server or Kafka consumer shutdown.
+    
+    Simulates exceptions raised while stopping the WebSocket server and Kafka consumer task, verifying that errors are logged with exception information and that shutdown proceeds gracefully.
     """
     deps = mock_external_dependencies
     twisted = mock_twisted_components
@@ -731,6 +778,9 @@ async def test_shutdown_event_error_scenarios(
 
     # Test Kafka consumer error
     async def error_task():
+        """
+        Asynchronous task that raises a RuntimeError to simulate a Kafka shutdown error.
+        """
         raise RuntimeError("Kafka shutdown error")
 
     mock_kafka_task = asyncio.create_task(error_task())
@@ -750,8 +800,7 @@ async def test_shutdown_event_no_websocket_server(
     mock_external_dependencies, mock_logger
 ):
     """
-    Test shutdown event when no WebSocket server is running. Verifies that shutdown handles
-    cases where no WebSocket server was started.
+    Tests that the shutdown event completes gracefully when no WebSocket server is running, ensuring no attempt is made to stop a non-existent server.
     """
     deps = mock_external_dependencies
 
@@ -776,8 +825,9 @@ async def test_shutdown_event_no_kafka_consumer(
     mock_external_dependencies, mock_logger
 ):
     """
-    Test shutdown event when no Kafka consumer is running. Verifies that shutdown handles
-    cases where no Kafka consumer was started.
+    Test that the shutdown event completes gracefully when no Kafka consumer is running.
+    
+    Verifies that the shutdown process skips Kafka consumer cleanup if no consumer task was started, and logs the appropriate shutdown messages.
     """
     deps = mock_external_dependencies
 
@@ -806,8 +856,9 @@ async def test_full_startup_shutdown_cycle(
     mock_external_dependencies, mock_logger, mock_twisted_components
 ):
     """
-    Test complete startup and shutdown cycle. Verifies that a complete startup followed by
-    shutdown works correctly and all resources are properly managed.
+    Tests the application's ability to perform a full startup and shutdown cycle, ensuring all services initialize and clean up correctly.
+    
+    Verifies that resources such as the WebSocket server and Kafka consumer are properly managed throughout the application's lifecycle.
     """
     deps = mock_external_dependencies
     twisted = mock_twisted_components
@@ -867,8 +918,9 @@ async def test_full_startup_shutdown_cycle(
 @pytest.mark.asyncio
 async def test_startup_with_partial_failures(mock_external_dependencies, mock_logger):
     """
-    Test startup with partial service failures. Verifies that startup handles cases where
-    some services fail but others succeed.
+    Test that the application startup event completes for available services even if the WebSocket server fails to start.
+    
+    Verifies that an error is logged when the WebSocket server factory raises an exception, but startup proceeds and marks completion for other services.
     """
     deps = mock_external_dependencies
 
@@ -892,8 +944,7 @@ async def test_startup_with_partial_failures(mock_external_dependencies, mock_lo
 @pytest.mark.asyncio
 async def test_environment_variable_integration():
     """
-    Test environment variable integration. Verifies that environment variables are properly
-    loaded and used throughout the application startup process.
+    Tests that environment variables are correctly loaded and applied to the application's configuration, specifically verifying CORS origins are set from environment values during FastAPI app initialization.
     """
     test_env_vars = {
         "CORS_ORIGINS": "http://test1.com,http://test2.com",
@@ -939,8 +990,9 @@ async def test_multiple_startup_shutdown_calls_and_edge_cases(
     mock_external_dependencies,
 ):
     """
-    Test multiple startup/shutdown calls and various edge cases including missing environment variables.
-    Verifies that multiple calls are handled gracefully and defaults work correctly.
+    Test repeated startup and shutdown event calls and edge cases such as missing environment variables.
+    
+    Verifies that multiple invocations of startup and shutdown events are handled without errors, and that the application initializes correctly with missing environment variables by falling back to defaults.
     """
     deps = mock_external_dependencies
 
@@ -967,8 +1019,9 @@ async def test_multiple_startup_shutdown_calls_and_edge_cases(
 @pytest.mark.asyncio
 async def test_reactor_missing_listen_tcp(mock_external_dependencies, mock_logger):
     """
-    Test startup when reactor doesn't have listenTCP method. Verifies that startup handles
-    cases where Twisted reactor doesn't support the expected interface.
+    Tests that the application startup event handles the absence of the `listenTCP` method on the Twisted reactor by logging an error and not starting the WebSocket server.
+    
+    Verifies that the WebSocket server is not marked as running and its port is unset in the application state.
     """
 
     # Mock reactor without listenTCP
@@ -992,8 +1045,7 @@ async def test_reactor_missing_listen_tcp(mock_external_dependencies, mock_logge
 
 def test_fastapi_app_multiple_cors_configurations():
     """
-    Test FastAPIApp with multiple CORS configurations and singleton behavior.
-    Verifies that CORS middleware is only added once and service configuration works correctly.
+    Tests that the FastAPIApp singleton maintains a single app instance, adds CORS middleware only once across multiple retrievals, and correctly applies service name and version configuration from patched constants.
     """
     # Clear any existing app instance
     FastAPIApp._app = None
@@ -1033,8 +1085,7 @@ def test_fastapi_app_multiple_cors_configurations():
 
 def test_module_imports_and_structure():
     """
-    Test module imports and overall structure. Verifies that all necessary imports
-    are present and the module structure is correct.
+    Test that the FastAPI application module contains all required components, imports, and feature flags.
     """
     import app.core.application as app_module
 
@@ -1061,8 +1112,7 @@ def test_module_imports_and_structure():
 @pytest.mark.asyncio
 async def test_memory_cleanup_and_resource_management(mock_external_dependencies):
     """
-    Test memory cleanup and resource management during shutdown and startup timeout handling.
-    Verifies that all references are properly cleaned up and timeouts are handled gracefully.
+    Tests that resources such as the Kafka consumer task are properly cleaned up during shutdown, and verifies that startup handles Redis connection timeouts gracefully by raising an asyncio.TimeoutError.
     """
     deps = mock_external_dependencies
 
@@ -1071,6 +1121,9 @@ async def test_memory_cleanup_and_resource_management(mock_external_dependencies
     deps["app_state"].redis_client = _create_mock_redis_client()
 
     async def cleanup_task():
+        """
+        Placeholder asynchronous cleanup task that performs no action.
+        """
         pass
 
     mock_kafka_task = asyncio.create_task(cleanup_task())
@@ -1086,6 +1139,12 @@ async def test_memory_cleanup_and_resource_management(mock_external_dependencies
 
     # Test startup timeout handling
     async def slow_connection():
+        """
+        Simulates a slow asynchronous connection by delaying for 10 seconds before returning a mock Redis client.
+        
+        Returns:
+            A mock Redis client instance after a simulated delay.
+        """
         await asyncio.sleep(10)  # Simulate slow connection
         return _create_mock_redis_client()
 

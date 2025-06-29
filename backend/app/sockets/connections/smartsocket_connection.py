@@ -81,17 +81,15 @@ class SmartSocketConnection(WebsocketConnection):
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["SmartSocketConnection"]:
         """
-        Initializes a SmartSocketConnection instance from the given configuration.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            The configuration object.
-
-        Returns
-        -------
-        ``Optional[SmartSocketConnection]``
-            An instance of SmartSocketConnection or None if initialization fails.
+        Create a SmartSocketConnection instance from a configuration object.
+        
+        Initializes the connection by determining the appropriate exchange, retrieving and partitioning tokens for the current instance, updating the provider's correlation ID, setting up the streaming data callback, and configuring the SmartSocket with the relevant tokens. Returns None if initialization fails due to invalid configuration or other errors.
+        
+        Parameters:
+            cfg (DictConfig): Configuration object containing connection, provider, and streaming settings.
+        
+        Returns:
+            Optional[SmartSocketConnection]: The initialized SmartSocketConnection instance, or None if initialization fails.
         """
         try:
             connection_instance_num = cfg.get("current_connection_number", 0)

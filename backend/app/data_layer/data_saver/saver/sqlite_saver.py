@@ -41,6 +41,11 @@ class SqliteDataSaver(DataSaver):
     """
 
     def __init__(self, consumer: Consumer, sqlite_db: str | Path) -> None:
+        """
+        Initialize the SqliteDataSaver with a Kafka consumer and a date-stamped SQLite database.
+        
+        The database file is created with the current date appended to its name, and the required schema is initialized.
+        """
         self.consumer = consumer
 
         if isinstance(sqlite_db, str):
@@ -106,8 +111,10 @@ class SqliteDataSaver(DataSaver):
 
     def retrieve_and_save(self):
         """
-        Retrieve the data from the kafka consumer and save it to the sqlite
-        database.
+        Continuously polls the Kafka consumer for new messages and saves them to the SQLite database.
+        
+        Raises:
+            KafkaException: If a Kafka error is encountered during message polling.
         """
         try:
             while True:
@@ -125,6 +132,12 @@ class SqliteDataSaver(DataSaver):
 
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["SqliteDataSaver"]:
+        """
+        Create a SqliteDataSaver instance from a configuration object.
+        
+        Returns:
+            SqliteDataSaver instance if both a Kafka consumer and SQLite database path are successfully configured; otherwise, returns None.
+        """
         consumer = get_kafka_consumer(
             {
                 "bootstrap.servers": cfg.streaming.kafka_server,

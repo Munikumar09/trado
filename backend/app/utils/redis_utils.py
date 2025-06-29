@@ -44,6 +44,18 @@ class RedisConnection(metaclass=Singleton):
         socket_connect_timeout: int = 5,
         retry_on_timeout: bool = True,
     ) -> None:
+        """
+        Initialize Redis connection parameters, using environment variables as defaults if not provided.
+        
+        Parameters:
+            host (str, optional): Redis server hostname. Defaults to the value of the REDIS_HOST environment variable if not specified.
+            port (int, optional): Redis server port. Defaults to the value of the REDIS_PORT environment variable if not specified.
+            db (int, optional): Redis database number. Defaults to the value of the REDIS_DB environment variable if not specified.
+            decode_responses (bool): Whether to decode responses from Redis. Defaults to True.
+            socket_timeout (int): Timeout in seconds for socket operations. Defaults to 5.
+            socket_connect_timeout (int): Timeout in seconds for establishing a connection. Defaults to 5.
+            retry_on_timeout (bool): Whether to retry commands if a timeout occurs. Defaults to True.
+        """
         self.host: str = host or get_env_var("REDIS_HOST")
         self.port: int = int(port or get_env_var("REDIS_PORT"))
         self.db: int = int(db or get_env_var("REDIS_DB"))
@@ -62,23 +74,17 @@ class RedisSyncConnection(RedisConnection):
 
     def get_connection(self) -> redis.Redis:
         """
-        Get a Redis connection from the connection pool. If the connection pool is not
-        initialized, it will be created. The connection is tested with a ping command
-        to ensure it is valid.
-
-        Returns
-        -------
-        ``redis.Redis``
-            A Redis connection object
-
-        Raises
-        ------
-        ``redis.ConnectionError``
-            If the connection to Redis fails
-        ``redis.TimeoutError``
-            If the connection times out
-        ``redis.ResponseError``
-            If the Redis server returns an error
+        Returns a synchronous Redis client from the connection pool, initializing the pool if necessary.
+        
+        The connection is verified with a ping command before being returned.
+        
+        Returns:
+            redis.Redis: A synchronous Redis client instance.
+        
+        Raises:
+            redis.ConnectionError: If unable to connect to the Redis server.
+            redis.TimeoutError: If the connection attempt times out.
+            redis.ResponseError: If the Redis server returns an error during the ping test.
         """
         if self.connection_pool is None:
             self.connection_pool = redis.ConnectionPool(
@@ -96,8 +102,7 @@ class RedisSyncConnection(RedisConnection):
 
     def close_connection(self) -> None:
         """
-        Close the Redis connection pool. This method is called when the application
-        is shutting down.
+        Closes the synchronous Redis connection pool and releases associated resources.
         """
         if self.connection_pool:
             self.connection_pool.disconnect()
@@ -114,23 +119,15 @@ class RedisAsyncConnection(RedisConnection):
 
     async def get_connection(self) -> async_redis.Redis:
         """
-        Get a AsyncRedis connection from the connection pool. If the connection pool is not
-        initialized, it will be created. The connection is tested with a ping command
-        to ensure it is valid.
-
-        Returns
-        -------
-        ``async_redis.Redis``
-            A asynchronous Redis connection object
-
-        Raises
-        ------
-        ``async_redis.ConnectionError``
-            If the connection to Redis fails
-        ``async_redis.TimeoutError``
-            If the connection times out
-        ``async_redis.ResponseError``
-            If the Redis server returns an error
+        Obtain an asynchronous Redis client using a managed connection pool.
+        
+        Returns:
+            An `async_redis.Redis` client instance connected to the configured Redis server.
+        
+        Raises:
+            async_redis.ConnectionError: If the connection to Redis fails.
+            async_redis.TimeoutError: If the connection times out.
+            async_redis.ResponseError: If the Redis server returns an error.
         """
 
         if self.connection_pool is None:
@@ -149,8 +146,7 @@ class RedisAsyncConnection(RedisConnection):
 
     async def close_connection(self) -> None:
         """
-        Close the Redis connection pool. This method is called when the application
-        is shutting down.
+        Closes the asynchronous Redis connection pool and releases associated resources.
         """
         if self.connection_pool:
             await self.connection_pool.disconnect()

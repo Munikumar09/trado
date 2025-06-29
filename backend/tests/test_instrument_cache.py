@@ -64,7 +64,7 @@ VALID_TIMESTAMP = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 )
 def test_parse_timestamp_valid_formats(ts_str: str, expected: datetime) -> None:
     """
-    Test parse_timestamp with various valid timestamp formats.
+    Tests that `parse_timestamp` correctly parses various valid timestamp string formats into the expected UTC-aware `datetime` objects.
     """
     dt = instrument_cache.parse_timestamp(ts_str)
     assert dt == expected
@@ -84,7 +84,7 @@ def test_parse_timestamp_invalid() -> None:
 
 def test_should_update() -> None:
     """
-    Test _should_update logic for timestamp comparisons.
+    Tests that the `_should_update` function returns `True` only when the new timestamp is strictly later than the current timestamp or when the current timestamp is `None`.
     """
     now = datetime.now(timezone.utc)
     later = now + timedelta(seconds=1)
@@ -97,7 +97,9 @@ def test_should_update() -> None:
 
 def test_validate_inputs() -> None:
     """
-    Test _validate_inputs for various valid and invalid input scenarios.
+    Test the _validate_inputs function for correct handling of valid and invalid keys, data types, and presence of required timestamp fields.
+    
+    Covers scenarios including valid input, invalid key types, invalid or missing data, and missing or malformed timestamp fields.
     """
     # Valid
     valid, ts = instrument_cache._validate_inputs(
@@ -138,7 +140,9 @@ def test_validate_inputs() -> None:
 
 def test_extract_current_timestamp() -> None:
     """
-    Test _extract_current_timestamp for valid, missing, and invalid JSON data.
+    Tests the _extract_current_timestamp function for correct extraction and parsing of the 'last_traded_timestamp' from JSON strings.
+    
+    Verifies that the function returns the parsed timestamp and its string representation when valid, and returns (None, None) for missing timestamps, invalid JSON, empty strings, or missing keys.
     """
     # Valid
     data = json.dumps({"last_traded_timestamp": VALID_TIMESTAMP})
@@ -208,7 +212,7 @@ async def test_update_stock_cache_valid() -> None:
 @pytest.mark.asyncio
 async def test_update_stock_cache_invalid() -> None:
     """
-    Test update_stock_cache for invalid input and invalid timestamp.
+    Asynchronously tests that update_stock_cache returns False for invalid input data or invalid timestamp values.
     """
     redis_connection = RedisAsyncConnection()
     r = await redis_connection.get_connection()
@@ -231,7 +235,7 @@ async def test_update_stock_cache_invalid() -> None:
 @pytest.mark.asyncio
 async def test_update_stock_cache_missing_timestamp() -> None:
     """
-    Test update_stock_cache with missing last_traded_timestamp in cache_data.
+    Test that update_stock_cache returns False when cache_data lacks a last_traded_timestamp key.
     """
     redis_connection = RedisAsyncConnection()
     r = await redis_connection.get_connection()
@@ -249,7 +253,12 @@ async def test_update_stock_cache_missing_timestamp() -> None:
 @pytest.mark.asyncio
 async def test_get_stock_data() -> None:
     """
-    Test get_stock_data for not found, valid, invalid stock name, and invalid JSON.
+    Asynchronously tests the `get_stock_data` function for various scenarios, including cache miss, valid retrieval, invalid stock names, and invalid cached JSON.
+    
+    Verifies that:
+    - `get_stock_data` returns `None` when the cache key is not found or the stock name is invalid.
+    - Retrieves and parses valid cached data correctly.
+    - Raises `CacheUpdateError` when the cached JSON is invalid.
     """
     redis_connection = RedisAsyncConnection()
     r = await redis_connection.get_connection()

@@ -16,17 +16,9 @@ def _done_callback(
     task: Task, error_callback: Callable[[BaseException | None], Any] | None
 ) -> None:
     """
-    This function is called when a task is done. It checks for exceptions and handles them
-    accordingly. If an error callback is provided, it will be called with the exception.
-    Otherwise, the exception will be logged. This function is added as a done callback to
-    the task when it is created.
-
-    Parameters
-    ----------
-    task : ``Task``
-        The task that has completed.
-    error_callback : ``Callable[[Exception], Any] | None``
-        Optional callback function to handle exceptions. If not provided, exceptions will be logged.
+    Handles completion of a background asyncio task, invoking an error callback or logging exceptions if they occurred.
+    
+    If the task raised an exception, calls the provided error callback with the exception, or logs the exception and its traceback if no callback is given. Silently ignores task cancellations. Ensures the completed task is removed from the active tasks set.
     """
     try:
         # Check if the task has an exception
@@ -65,34 +57,20 @@ def fire_and_forgot(
     error_callback: Callable[[BaseException | None], Any] | None = None,
 ) -> Task:
     """
-    Fire and forget a coroutine while ensuring proper error handling.
-
-    This function is used to run a coroutine without awaiting its result,
-    but still provides error handling and task tracking. The task is added
-    to a global set to prevent garbage collection until complete.
-
-    Parameters
-    ----------
-    coro: ``Coroutine``
-        The coroutine to be executed in the current event loop in the background.
-    done_callback: ``Callable[[Task], Any] | None``, ( default = None )
-        Optional callback function to be called when the task is done.
-        This callback will be called with the task as an argument.
-    error_callback: ``Callable[[Exception], Any] | None``, ( default = None )
-        Optional callback function to handle exceptions. If not provided,
-        exceptions will be logged. This callback will be called with the
-        exception as an argument.
-
-
-    Returns
-    -------
-    ``Task``
-        The task object created from the coroutine.
-
-    Raises
-    ------
-    ``RuntimeError``
-        If no running event loop is found.
+    Schedules a coroutine to run in the background with error handling and lifecycle tracking.
+    
+    Creates an asyncio Task from the given coroutine and adds it to a global set to prevent premature garbage collection. Attaches a completion callback for error reporting or custom handling. Raises a RuntimeError if called outside an active event loop.
+    
+    Parameters:
+        coro (Coroutine): The coroutine to execute as a background task.
+        done_callback (Callable[[Task], Any], optional): Callback invoked when the task completes.
+        error_callback (Callable[[BaseException | None], Any], optional): Callback invoked if the task raises an exception.
+    
+    Returns:
+        Task: The asyncio Task object representing the scheduled coroutine.
+    
+    Raises:
+        RuntimeError: If no running event loop is found.
     """
     try:
         loop = asyncio.get_running_loop()
@@ -119,25 +97,22 @@ def fire_and_forgot(
 
 def get_active_tasks_count() -> int:
     """
-    Get the current number of active background tasks.
-
-    Returns
-    -------
-    ``int``
-        The number of active background tasks.
+    Return the number of currently tracked active background asyncio tasks.
+    
+    Returns:
+        int: The count of active tasks being managed.
     """
     return len(_active_tasks)
 
 
 async def cancel_all_tasks() -> int:
     """
-    Cancel all tracked background tasks. This function is useful during shutdown to ensure
-    clean termination.
-
-    Returns
-    -------
-    ``int``
-        The number of tasks that were cancelled.
+    Cancel all currently tracked background asyncio tasks.
+    
+    This coroutine issues cancellation requests to all active tasks that are not already completed or cancelled, then briefly awaits to allow tasks to process the cancellation.
+    
+    Returns:
+        int: The number of tasks that were cancelled.
     """
     cancelled = 0
     tasks = list(_active_tasks)  # Make a copy to avoid modification during iteration

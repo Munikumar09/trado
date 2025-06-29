@@ -60,7 +60,15 @@ class MockNotificationProvider:
 
     def send_notification(self, code: str, recipient_email: str, recipient_name: str):
         """
-        Test method to send a notification.
+        Stores the provided verification code and recipient details, simulating the sending of a notification.
+        
+        Parameters:
+            code (str): The verification code to be sent.
+            recipient_email (str): The recipient's email address.
+            recipient_name (str): The recipient's name.
+        
+        Returns:
+            dict: A message indicating the verification code was sent and its validity period.
         """
         self.code = code
         self.recipient_email = recipient_email
@@ -73,7 +81,9 @@ class MockNotificationProvider:
 @pytest.fixture(autouse=True)
 def mock_notification_provider(mocker: MockFixture):
     """
-    Mock the notification provider.
+    Automatically replaces the email notification provider with a mock for all tests.
+    
+    This fixture ensures that all email notifications sent during tests use the MockNotificationProvider, allowing verification of notification behavior without sending real emails.
     """
     return mocker.patch(
         "app.routers.authentication.authentication.email_notification_provider",
@@ -144,11 +154,12 @@ def validate_verification_code_sent(
     response: Response, email: str, notification_provider: MockNotificationProvider
 ):
     """
-    Validate the verification code sent with the following assertions:
-    - The response status code is 200
-    - The code is not None
-    - The code is of length 6
-    - The recipient email is the same as the email passed
+    Asserts that a verification code was successfully sent by checking the response status, code presence and length, and recipient email.
+    
+    Parameters:
+        response (Response): The HTTP response object from the verification code endpoint.
+        email (str): The expected recipient email address.
+        notification_provider (MockNotificationProvider): The mock notification provider used to capture sent codes.
     """
     assert response.status_code == 200
     assert notification_provider.code is not None
@@ -160,13 +171,12 @@ def validate_user_verification(
     user_verification: UserVerification, email: str, code: str
 ):
     """
-    Validate the user verification object with the following assertions:
-    - The user verification object is not None
-    - The email is the same as the email passed
-    - The code is the same as the code passed
-    - The expiration time is greater than the current time
-    - The verification datetime is the same as the current date
-    - The reverified datetime is the same as the current date
+    Asserts that a UserVerification object matches the expected email, code, and has valid expiration and verification dates.
+    
+    Parameters:
+        user_verification (UserVerification): The user verification object to validate.
+        email (str): The expected email address.
+        code (str): The expected verification code.
     """
     assert user_verification is not None
     assert user_verification.email == email

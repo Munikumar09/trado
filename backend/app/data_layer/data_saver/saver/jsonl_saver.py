@@ -33,6 +33,11 @@ class JSONLDataSaver(DataSaver):
     """
 
     def __init__(self, consumer: Consumer, jsonl_file_path: str | Path) -> None:
+        """
+        Initialize a JSONLDataSaver instance with a Kafka consumer and a target JSONL file path.
+        
+        The file path is converted to a Path object if necessary, its parent directory is created if it does not exist, and the filename is suffixed with the current date in YYYY_MM_DD format before the `.jsonl` extension.
+        """
         self.consumer = consumer
 
         if isinstance(jsonl_file_path, str):
@@ -48,7 +53,9 @@ class JSONLDataSaver(DataSaver):
 
     def retrieve_and_save(self):
         """
-        Retrieve the data from the kafka consumer and save it to the jsonl file.
+        Continuously consumes messages from the Kafka topic and appends each as a JSON object line to the JSONL file.
+        
+        Messages are polled from the Kafka consumer, decoded from UTF-8, parsed as JSON, and written to the file in JSON Lines format. The process continues indefinitely until interrupted or an exception occurs. The Kafka consumer is closed and the total number of messages saved is logged upon completion.
         """
         try:
             idx = 0
@@ -75,7 +82,10 @@ class JSONLDataSaver(DataSaver):
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["JSONLDataSaver"]:
         """
-        Create an instance of the JSONLDataSaver class from the given configuration.
+        Instantiate a JSONLDataSaver from a configuration object.
+        
+        Returns:
+            JSONLDataSaver instance if both a Kafka consumer and a JSONL file path are successfully configured; otherwise, returns None.
         """
         consumer = get_kafka_consumer(
             {

@@ -70,26 +70,9 @@ class KafkaConsumer(Consumer):
         config: dict[str, Any] | None = None,
     ) -> None:
         """
-        Initialize a Kafka consumer for market data.
-
-        Creates a new Kafka consumer with the specified parameters or defaults
-        from environment variables. Sets up a thread pool for handling blocking
-        Kafka operations without blocking the asyncio event loop.
-
-        Parameters
-        ----------
-        topic: ``str | None``, ( default = None)
-            The Kafka topic to subscribe to. If None, uses the KAFKA_TOPIC_INSTRUMENT
-            environment variable.
-        group_id: ``str | None``, ( default = None))
-            The consumer group ID. If None, uses the KAFKA_CONSUMER_GROUP_ID
-            environment variable.
-        brokers: ``str | None``, ( default = None))
-            The Kafka broker URL(s). If None, uses the KAFKA_BROKER_URL
-            environment variable.
-        config: ``dict[str, Any] | None``, ( default = None))
-            Additional Kafka consumer configuration. If provided, these settings
-            will override the default configuration values.
+        Initializes a Kafka consumer for streaming market data.
+        
+        Sets up the consumer with the specified topic, group ID, brokers, and configuration, defaulting to environment variables if not provided. Prepares a thread pool executor for running blocking Kafka operations without blocking the asyncio event loop.
         """
         self.topic = topic or get_env_var(KAFKA_TOPIC_INSTRUMENT)
         self.group_id = group_id or get_env_var(KAFKA_CONSUMER_GROUP_ID)
@@ -105,14 +88,10 @@ class KafkaConsumer(Consumer):
 
     def _create_consumer(self) -> ConfluentConsumer:
         """
-        Create a configured Confluent Kafka consumer instance.
-        Sets up a Kafka consumer with the appropriate configuration and
-        subscribes it to the specified topic.
-
-        Returns
-        -------
-        consumer: ``ConfluentConsumer``
-            A configured and subscribed Confluent Kafka consumer instance
+        Create and configure a Confluent Kafka consumer subscribed to the specified topic.
+        
+        Returns:
+            ConfluentConsumer: The configured and subscribed Kafka consumer instance.
         """
         config: Dict[str, Any] = {
             "bootstrap.servers": self.brokers,
@@ -131,22 +110,13 @@ class KafkaConsumer(Consumer):
 
     def _poll_message(self) -> str | None:
         """
-        Poll Kafka for a single message in a blocking manner.
-
-        This method is meant to be executed within a ThreadPoolExecutor
-        to avoid blocking the main asyncio event loop, as Confluent Kafka's
-        consumer.poll() is a synchronous/blocking operation.
-
-        Returns
-        -------
-        message: ``str | None``
-            The message value as a UTF-8 decoded string if a message was received,
-            or None if no message was available within the poll timeout (1 second)
-
-        Raises
-        ------
-        ``KafkaException``
-            If the polled message contains an error or there's a Kafka-related issue
+        Synchronously polls Kafka for a single message and returns its decoded value.
+        
+        Returns:
+            str | None: The UTF-8 decoded message string if received, or None if no message is available within the 1-second timeout.
+        
+        Raises:
+            KafkaException: If the polled message contains an error.
         """
         msg = self.consumer.poll(timeout=1.0)
         if msg is None:
@@ -159,7 +129,13 @@ class KafkaConsumer(Consumer):
 
     def _transform_message(self, payload: dict[str, Any]) -> dict[str, Any]:
         """
-        Transform the raw payload into the required message format.
+        Convert a raw Kafka message payload into a standardized market data dictionary.
+        
+        Parameters:
+            payload (dict): The raw message payload containing market data fields.
+        
+        Returns:
+            dict: A dictionary with normalized keys and values, including timestamps, symbol, exchange, data provider, prices, and quantities.
         """
         return {
             "retrieval_timestamp": payload["retrieval_timestamp"],
@@ -183,24 +159,12 @@ class KafkaConsumer(Consumer):
 
     async def process_message(self, data: dict[str, Any], redis_client: Redis) -> None:
         """
-        Process a market data message from Kafka and publish to Redis.
-
-        Takes transformed market data, publishes it to the appropriate Redis
-        channel for real-time updates, and updates the cache with the latest data.
-
-        Parameters
-        ----------
-        data: ``dict[str, Any]``
-            The transformed market data message containing symbol, price, and other
-            trading information
-        redis_client: ``Redis``
-            The Redis client instance to use for publishing and cache updates
-
-        Raises
-        ------
-        ``Exception``
-            Any errors during Redis publishing or cache updating will propagate
-            and should be handled by the caller
+        Publishes a transformed market data message to a Redis channel and updates the cache.
+        
+        Publishes the provided market data to a Redis channel named for the symbol and exchange, and updates the corresponding cache entry. If required fields are missing, the message is skipped.
+        
+        Raises:
+            Exception: Propagates any errors encountered during Redis publishing or cache updating.
         """
         try:
             symbol = data.get("symbol")
@@ -226,7 +190,7 @@ class KafkaConsumer(Consumer):
 
     def _handle_consume_error(self, error: Exception, raw: str | None) -> None:
         """
-        Handle errors during message consumption and log appropriately.
+        Logs errors encountered during message consumption, including JSON decoding errors, Kafka exceptions, and unexpected exceptions, with relevant context for debugging.
         """
         if isinstance(error, json.JSONDecodeError):
             logger.error(
@@ -241,7 +205,10 @@ class KafkaConsumer(Consumer):
 
     async def _apply_backoff(self, consecutive_errors: int) -> None:
         """
-        Apply exponential backoff with jitter based on consecutive errors.
+        Asynchronously waits for a calculated backoff period after consecutive errors, using exponential backoff with jitter.
+        
+        Parameters:
+            consecutive_errors (int): The number of consecutive errors encountered, used to determine the backoff duration.
         """
         backoff_time = min(
             MIN_BACKOFF_TIME * (2 ** (consecutive_errors - 1)) + random.uniform(0, 1),
@@ -270,18 +237,9 @@ class KafkaConsumer(Consumer):
 
     async def consume_messages(self) -> None:
         """
-        Continuously consume and process messages from Kafka.
-
-        Main consumer loop that polls Kafka for messages, transforms them into
-        the proper format, and processes them by publishing to Redis and updating
-        the cache. Implements robust error handling with exponential backoff for
-        transient failures and automatic consumer restart for persistent issues.
-
-        Raises
-        ------
-        ``Exception``
-            Fatal errors that cannot be handled within the retry mechanism
-            will be propagated after resource cleanup
+        Asynchronously consumes messages from Kafka, processes them, and publishes to Redis channels with cache updates.
+        
+        Continuously polls Kafka for new messages, transforms and processes each message, and handles errors with exponential backoff and automatic consumer restarts on persistent failures. Cleans up resources and propagates fatal exceptions after shutdown.
         """
         logger.info(
             "Starting Kafka consumer (topic=%s, group=%s)",
@@ -353,10 +311,9 @@ class KafkaConsumer(Consumer):
 
     def stop(self):
         """
-        Signal the consumer to gracefully stop processing messages.
-
-        Sets the internal flag to indicate that the consumer should stop
-        running after completing the current message processing.
+        Signals the consumer to stop processing messages after the current iteration.
+        
+        Sets an internal flag to allow for graceful shutdown of the consumer loop.
         """
         logger.info("Received stop signal for Kafka consumer")
         self._should_run = False
@@ -364,25 +321,15 @@ class KafkaConsumer(Consumer):
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["KafkaConsumer"]:
         """
-        Create a KafkaConsumer instance from a configuration object.
-
-        Factory method to instantiate and configure a Kafka consumer
-        using parameters defined in a configuration object.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing Kafka settings including:
-            - topic: The Kafka topic to subscribe to
-            - group_id: The consumer group ID
-            - brokers: The Kafka broker URL(s)
-            - consumer_config: Additional configuration parameters
-
-        Returns
-        -------
-        consumer: ``KafkaConsumer | None``
-            A configured KafkaConsumer instance if the configuration is valid,
-            or None if the configuration is invalid or an error occurs
+        Instantiate a KafkaConsumer from a configuration object.
+        
+        Creates and configures a KafkaConsumer using parameters extracted from the provided DictConfig. Returns None if instantiation fails due to invalid configuration or errors.
+        
+        Parameters:
+            cfg (DictConfig): Configuration object containing Kafka consumer settings.
+        
+        Returns:
+            KafkaConsumer | None: Configured KafkaConsumer instance, or None if creation fails.
         """
         try:
             config_dict = {}

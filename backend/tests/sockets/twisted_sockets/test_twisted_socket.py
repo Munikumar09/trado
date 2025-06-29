@@ -52,7 +52,10 @@ def mock_connect_ws(mocker: MockerFixture):
 @pytest.fixture
 def mock_threading(mocker: MockerFixture):
     """
-    Mock the threading module.
+    Mocks the threading module used in the target module for testing purposes.
+    
+    Returns:
+        MagicMock: The mocked threading module.
     """
     return mocker.patch("app.sockets.twisted_socket.threading")
 
@@ -88,7 +91,7 @@ class SampleWebSocket(MarketDataTwistedSocket):
 @pytest.fixture
 def websocket_instance() -> SampleWebSocket:
     """
-    Fixture to provide a TestWebSocket instance.
+    Fixture that provides an instance of the SampleWebSocket test subclass for use in test cases.
     """
     return SampleWebSocket()
 
@@ -99,7 +102,7 @@ def websocket_instance() -> SampleWebSocket:
 # Test: 1
 def test_initialization(websocket_instance: SampleWebSocket):
     """
-    Test the initialization values of the WebSocket instance.
+    Verifies that a SampleWebSocket instance initializes with the expected default attribute values.
     """
     assert websocket_instance.ping_interval == 10
     assert websocket_instance.ping_message == "ping"
@@ -117,7 +120,7 @@ def test_create_connection(
     mock_websocket_factory: MockType, websocket_instance: SampleWebSocket
 ):
     """
-    Test the creation of the WebSocket connection and ensure factory setup is correct.
+    Tests that the WebSocket connection is created correctly and the factory is initialized with the expected parameters and callbacks.
     """
     websocket_instance._create_connection("ws://mock-url")
 
@@ -145,7 +148,9 @@ def test_connect(
     mock_threading: MockType,
 ):
     """
-    Test the connect functionality with both threaded and non-threaded options.
+    Tests the connect method of SampleWebSocket for both threaded and non-threaded scenarios.
+    
+    Verifies that the appropriate connection logic is executed, including reactor handling and thread creation, depending on the threaded parameter.
     """
     websocket_instance.websocket_url = "ws://mock-url"
     websocket_instance.headers = {"Authorization": "Bearer token"}
@@ -175,7 +180,7 @@ def test_connect(
 # Test: 4
 def test_is_connected(websocket_instance: SampleWebSocket):
     """
-    Test the is_connected method to check WebSocket connection status.
+    Verify that the is_connected method correctly reports the WebSocket connection status based on the underlying state.
     """
     websocket_instance.ws = MagicMock()
     websocket_instance.ws.STATE_OPEN = 1
@@ -193,7 +198,7 @@ def test_is_connected(websocket_instance: SampleWebSocket):
 # Test: 5
 def test_close(websocket_instance: SampleWebSocket):
     """
-    Test the close method to ensure the WebSocket is properly closed.
+    Tests that the `close` method properly closes the WebSocket connection and sets the internal WebSocket object to `None`.
     """
     websocket_instance.ws = MagicMock()
     websocket_instance.close(code=1000, reason="Test close")
@@ -204,7 +209,7 @@ def test_close(websocket_instance: SampleWebSocket):
 # Test: 6
 def test_on_connect(websocket_instance: SampleWebSocket):
     """
-    Test the _on_connect method to ensure the on_connect callback is executed.
+    Verify that the `_on_connect` method invokes the `on_connect` callback with the websocket and response arguments.
     """
     ws = MagicMock()
     response = MagicMock()
@@ -217,7 +222,7 @@ def test_on_connect(websocket_instance: SampleWebSocket):
 # Test: 7
 def test_on_close(websocket_instance: SampleWebSocket):
     """
-    Test the _on_close method to ensure the on_close callback is executed.
+    Verify that the `_on_close` method invokes the `on_close` callback with the correct arguments.
     """
     ws = MagicMock()
     websocket_instance.on_close = MagicMock()
@@ -229,7 +234,7 @@ def test_on_close(websocket_instance: SampleWebSocket):
 # Test: 8
 def test_on_reconnect(websocket_instance: SampleWebSocket):
     """
-    Test the _on_reconnect method to ensure the on_reconnect callback is executed.
+    Verify that the `_on_reconnect` method triggers the `on_reconnect` callback with the correct arguments.
     """
     websocket_instance.on_reconnect = MagicMock()
     websocket_instance._on_reconnect(3)
@@ -240,7 +245,7 @@ def test_on_reconnect(websocket_instance: SampleWebSocket):
 # Test: 9
 def test_stop_retry(websocket_instance: SampleWebSocket):
     """
-    Test the stop_retry method to ensure retrying is properly stopped.
+    Verify that the stop_retry method calls stopTrying on the WebSocket factory to halt reconnection attempts.
     """
     websocket_instance.factory = MagicMock()
     websocket_instance.stop_retry()
@@ -252,7 +257,7 @@ def test_stop_retry(websocket_instance: SampleWebSocket):
 # Test: 10
 def test_stop_reactor(mock_reactor: MockType, websocket_instance: SampleWebSocket):
     """
-    Test the stop method to ensure the reactor is stopped.
+    Test that the stop method correctly stops the Twisted reactor.
     """
     websocket_instance.stop()
     mock_reactor.stop.assert_called_once()

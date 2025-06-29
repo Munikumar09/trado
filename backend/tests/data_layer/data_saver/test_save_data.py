@@ -31,16 +31,12 @@ class MockDataSaver(DataSaver):
         self, name: str, should_fail: bool = False, execution_time: float = 0.1
     ):
         """
-        Initialize MockDataSaver instance.
-
-        Parameters
-        -----------
-        name: ``str``
-            Name of the mock data saver
-        should_fail: ``bool``
-            Whether the saver should fail during execution, defaults to False
-        execution_time: ``float``
-            Simulated execution time in seconds, defaults to 0.1
+        Create a MockDataSaver instance for testing, with configurable failure behavior and simulated execution time.
+        
+        Parameters:
+            name (str): Identifier for the mock data saver.
+            should_fail (bool, optional): If True, the saver will simulate a failure during execution. Defaults to False.
+            execution_time (float, optional): Time in seconds to simulate work during execution. Defaults to 0.1.
         """
         self.name = name
         self.should_fail = should_fail
@@ -50,10 +46,9 @@ class MockDataSaver(DataSaver):
 
     def retrieve_and_save(self):
         """
-        Mock implementation of retrieve_and_save.
-
-        Simulates work execution and tracks thread information.
-        Raises RuntimeError if should_fail is True.
+        Simulates data retrieval and saving, optionally raising an error to mimic failure.
+        
+        Sets flags indicating execution, records the current thread ID, and sleeps for the configured execution time. Raises a RuntimeError if the instance is configured to fail.
         """
         self.retrieve_and_save_called = True
         self.thread_id = threading.current_thread().ident
@@ -67,17 +62,13 @@ class MockDataSaver(DataSaver):
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> "MockDataSaver":
         """
-        Mock implementation of from_cfg.
-
-        Parameters
-        -----------
-        cfg: ``DictConfig``
-            Configuration object containing saver settings
-
-        Returns
-        --------
-        ``MockDataSaver``
-            New MockDataSaver instance created from configuration
+        Create a MockDataSaver instance from a configuration object.
+        
+        Parameters:
+        	cfg (DictConfig): Configuration containing 'name', 'should_fail', and 'execution_time' settings.
+        
+        Returns:
+        	MockDataSaver: A new instance initialized with values from the configuration.
         """
         return cls(
             name=cfg.get("name", "unnamed"),
@@ -93,17 +84,13 @@ class MockDataSaver(DataSaver):
 
 def create_config_with_savers(*saver_configs) -> DictConfig:
     """
-    Create a configuration with specified data savers.
-
-    Parameters
-    -----------
-    *saver_configs: ``dict[str, Any]``
-        Variable number of saver configuration dictionaries
-
-    Returns
-    --------
-    ``DictConfig``
-        OmegaConf configuration object with data_saver list
+    Create an OmegaConf configuration containing a list of data saver configurations.
+    
+    Parameters:
+        *saver_configs: One or more dictionaries representing individual saver configurations.
+    
+    Returns:
+        DictConfig: An OmegaConf configuration object with a 'data_saver' key containing the provided saver configurations.
     """
     return OmegaConf.create({"data_saver": list(saver_configs)})
 
@@ -112,21 +99,15 @@ def create_saver_config(
     name: str, saver_type: str = "mock", **kwargs
 ) -> dict[str, Any]:
     """
-    Create a single data saver configuration.
-
-    Parameters
-    -----------
-    name: ``str``
-        Name of the data saver
-    saver_type: ``str``
-        Type of the data saver, defaults to "mock"
-    **kwargs: ``Any``
-        Additional configuration parameters
-
-    Returns
-    --------
-    ``dict[str, Any]``
-        Dictionary containing saver configuration with name as key
+    Generate a configuration dictionary for a single data saver.
+    
+    Parameters:
+        name (str): The unique name of the data saver.
+        saver_type (str): The type identifier for the data saver. Defaults to "mock".
+        **kwargs: Additional configuration fields to include in the saver config.
+    
+    Returns:
+        dict[str, Any]: A dictionary mapping the saver name to its configuration dictionary.
     """
     config = {"name": name, "type": saver_type, **kwargs}
     return {name: config}
@@ -136,23 +117,10 @@ def setup_multi_saver_mocks(
     mock_init_from_cfg: MockType, mock_thread: MockType, saver_names: list[str]
 ) -> tuple[list[MockDataSaver], list[MagicMock]]:
     """
-    Set up mocks for multiple savers with consistent pattern.
-
-    Parameters
-    -----------
-    mock_init_from_cfg: ``MockType``
-        Mock for init_from_cfg function
-    mock_thread: ``MockType``
-        Mock for Thread class
-    saver_names: ``list[str]``
-        List of saver names to create mocks for
-
-    Returns
-    --------
-    mock_savers: ``list[MockDataSaver]``
-        List of mock data saver instances
-    mock_thread_instances: ``list[MagicMock]``
-        List of mock thread instances
+    Creates mock data saver instances and corresponding mock thread instances for a list of saver names.
+    
+    Returns:
+        A tuple containing a list of `MockDataSaver` instances and a list of mock thread instances, one for each saver name.
     """
     mock_savers = [MockDataSaver(name) for name in saver_names]
     mock_init_from_cfg.side_effect = mock_savers
@@ -167,23 +135,10 @@ def setup_single_saver_mock(
     mock_init_from_cfg: MockType, mock_thread: MockType, saver_name: str
 ) -> tuple[MockDataSaver, MagicMock]:
     """
-    Set up mocks for a single saver.
-
-    Parameters
-    -----------
-    mock_init_from_cfg: ``MockType``
-        Mock for init_from_cfg function
-    mock_thread: ``MockType``
-        Mock for Thread class
-    saver_name: ``str``
-        Name of the saver to create mock for
-
-    Returns
-    --------
-    mock_saver: ``MockDataSaver``
-        Mock data saver instance
-    mock_thread_instance: ``MagicMock``
-        Mock thread instance
+    Creates and configures mock objects for testing a single data saver and its associated thread.
+    
+    Returns:
+        A tuple containing the mock data saver instance and the mock thread instance.
     """
     mock_saver = MockDataSaver(saver_name)
     mock_init_from_cfg.return_value = mock_saver
@@ -196,12 +151,10 @@ def setup_single_saver_mock(
 
 def verify_thread_operations(mock_thread_instances: list[MagicMock]) -> None:
     """
-    Verify that all thread instances were started and joined.
-
-    Parameters
-    -----------
-    mock_thread_instances: ``list[MagicMock]``
-        List of mock thread instances to verify
+    Assert that each mock thread instance was started and joined exactly once.
+    
+    Parameters:
+        mock_thread_instances (list[MagicMock]): List of mock thread instances to verify.
     """
     for thread_instance in mock_thread_instances:
         thread_instance.start.assert_called_once()
@@ -210,14 +163,9 @@ def verify_thread_operations(mock_thread_instances: list[MagicMock]) -> None:
 
 def verify_info_logs_for_savers(mock_logger: MockType, saver_names: list[str]) -> None:
     """
-    Verify that info logs were created for starting savers.
-
-    Parameters
-    -----------
-    mock_logger: ``MockType``
-        Mock logger instance
-    saver_names: ``list[str]``
-        List of saver names that should have been logged
+    Assert that info logs were generated for each saver name indicating the saver was started.
+    
+    Checks that the mock logger's info method was called with the expected messages for all provided saver names.
     """
     expected_calls = [call("Starting the saver %s", name) for name in saver_names]
     mock_logger.info.assert_has_calls(expected_calls, any_order=True)
@@ -227,14 +175,9 @@ def verify_error_logs_for_unregistered_savers(
     mock_logger: MockType, saver_names: list[str]
 ) -> None:
     """
-    Verify that error logs were created for unregistered savers.
-
-    Parameters
-    -----------
-    mock_logger: ``MockType``
-        Mock logger instance
-    saver_names: ``list[str]``
-        List of saver names that should have error logs
+    Assert that error logs were generated for each unregistered saver name.
+    
+    Checks that the mock logger's error method was called with the expected messages for all provided saver names.
     """
     expected_error_calls = [
         call("Data saver %s is not registered", name) for name in saver_names
@@ -246,14 +189,9 @@ def verify_thread_creation_for_savers(
     mock_thread: MockType, mock_savers: list[MockDataSaver]
 ) -> None:
     """
-    Verify that threads were created with correct targets for each saver.
-
-    Parameters
-    -----------
-    mock_thread: ``MockType``
-        Mock Thread class
-    mock_savers: ``list[MockDataSaver]``
-        List of mock savers to verify thread creation for
+    Assert that a thread was created for each mock saver with the correct target function.
+    
+    Checks that the mock Thread class was called with each saver's `retrieve_and_save` method as the thread target.
     """
     expected_calls = [call(target=saver.retrieve_and_save) for saver in mock_savers]
     mock_thread.assert_has_calls(expected_calls, any_order=True)
@@ -264,12 +202,10 @@ def patch_save_data_dependencies() -> (
     Generator[tuple[MockType, MockType, MockType], None, None]
 ):
     """
-    Context manager to patch common save_data module dependencies.
-
-    Yields
-    --------
-    tuple[MockType, MockType, MockType]
-        Tuple of (mock_init, mock_thread, mock_logger)
+    Context manager that patches the `init_from_cfg`, `Thread`, and `logger` dependencies in the `save_data` module for testing.
+    
+    Yields:
+        tuple[MockType, MockType, MockType]: A tuple containing mocks for `init_from_cfg`, `Thread`, and `logger`.
     """
     with patch("app.data_layer.data_saver.save_data.init_from_cfg") as mock_init:
         with patch("app.data_layer.data_saver.save_data.Thread") as mock_thread:
@@ -284,27 +220,16 @@ def setup_mixed_success_failure_mocks(
     failure_index: int,
 ) -> tuple[list[MockDataSaver | None], list[MockDataSaver], list[MagicMock]]:
     """
-    Set up mocks for mixed success/failure scenario.
-
-    Parameters
-    -----------
-    mock_init_from_cfg: ``MockType``
-        Mock for init_from_cfg function
-    mock_thread: ``MockType``
-        Mock for Thread class
-    success_names: ``list[str]``
-        List of successful saver names
-    failure_index: ``int``
-        Index where failure should occur
-
-    Returns
-    --------
-    mock_savers_with_none: ``list[MockDataSaver | None]``
-        List of mock savers with None at failure index
-    successful_mock_savers: ``list[MockDataSaver]``
-        List of successful mock savers only
-    mock_thread_instances: ``list[MagicMock]``
-        List of mock thread instances for successful savers
+    Configures mocks for a scenario where saver creation partially fails, returning a list of mock savers with one failure, the successful savers, and corresponding mock thread instances.
+    
+    Parameters:
+        success_names (list[str]): Names of savers to simulate as successful.
+        failure_index (int): Index in the list where saver creation should fail (returns None).
+    
+    Returns:
+        mock_savers_with_none (list[MockDataSaver | None]): List of mock savers with None at the failure index.
+        successful_mock_savers (list[MockDataSaver]): List of successfully created mock savers.
+        mock_thread_instances (list[MagicMock]): Mock thread instances for each successful saver.
     """
     # Create mock savers with None at failure index
     mock_savers_with_none: list[MockDataSaver | None] = []
@@ -335,7 +260,7 @@ def setup_mixed_success_failure_mocks(
 @pytest.fixture
 def mock_logger(mocker: MockerFixture) -> MockType:
     """
-    Mock the logger.
+    Fixture that provides a mock for the logger used in the save_data module.
     """
     return mocker.patch("app.data_layer.data_saver.save_data.logger")
 
@@ -343,7 +268,10 @@ def mock_logger(mocker: MockerFixture) -> MockType:
 @pytest.fixture
 def mock_init_from_cfg(mocker: MockerFixture) -> MockType:
     """
-    Mock the init_from_cfg function.
+    Fixture that patches the `init_from_cfg` function in the `save_data` module for use in tests.
+    
+    Returns:
+        MockType: The mock object replacing `init_from_cfg`.
     """
     return mocker.patch("app.data_layer.data_saver.save_data.init_from_cfg")
 
@@ -351,7 +279,10 @@ def mock_init_from_cfg(mocker: MockerFixture) -> MockType:
 @pytest.fixture
 def mock_thread(mocker: MockerFixture) -> MockType:
     """
-    Mock the Thread class.
+    Fixture that patches the Thread class used in the save_data module for testing purposes.
+    
+    Returns:
+        MockType: The patched Thread class mock.
     """
     return mocker.patch("app.data_layer.data_saver.save_data.Thread")
 
@@ -359,7 +290,10 @@ def mock_thread(mocker: MockerFixture) -> MockType:
 @pytest.fixture
 def basic_single_saver_config() -> DictConfig:
     """
-    Basic configuration with a single data saver.
+    Provides a DictConfig containing a single data saver configuration for testing purposes.
+    
+    Returns:
+        DictConfig: Configuration object with one mock data saver entry.
     """
     return create_config_with_savers(create_saver_config("test_saver"))
 
@@ -367,7 +301,10 @@ def basic_single_saver_config() -> DictConfig:
 @pytest.fixture
 def multi_saver_config() -> DictConfig:
     """
-    Configuration with multiple data savers.
+    Provides a configuration containing multiple data saver entries for testing.
+    
+    Returns:
+        DictConfig: An OmegaConf configuration with three savers: 'csv_saver', 'sqlite_saver', and 'jsonl_saver'.
     """
     return create_config_with_savers(
         create_saver_config("csv_saver"),
@@ -379,12 +316,10 @@ def multi_saver_config() -> DictConfig:
 @pytest.fixture
 def empty_config() -> DictConfig:
     """
-    Configuration with no data savers.
-
-    Returns
-    --------
-    config: ``DictConfig``
-        Configuration object with empty data_saver list
+    Provides a configuration object with an empty list of data savers.
+    
+    Returns:
+        DictConfig: A configuration containing no data savers.
     """
     return OmegaConf.create({"data_saver": []})
 
@@ -401,7 +336,7 @@ def test_main_processes_single_saver_config(
     basic_single_saver_config: DictConfig,
 ) -> None:
     """
-    Test that main correctly processes a single data saver configuration.
+    Verify that the main function processes a configuration with a single data saver, correctly initializes the saver, creates and manages its thread, and logs the appropriate info message.
     """
     mock_saver, mock_thread_instance = setup_single_saver_mock(
         mock_init_from_cfg, mock_thread, "test_saver"
@@ -430,7 +365,7 @@ def test_main_processes_multiple_saver_config(
     multi_saver_config: DictConfig,
 ) -> None:
     """
-    Test that main correctly processes multiple data saver configurations.
+    Verify that the main function processes a configuration with multiple data savers by initializing each saver, creating and managing separate threads for each, and logging info for all savers.
     """
     saver_names = ["csv_saver", "sqlite_saver", "jsonl_saver"]
     mock_savers, mock_thread_instances = setup_multi_saver_mocks(
@@ -459,7 +394,7 @@ def test_main_handles_empty_config(
     empty_config: DictConfig,
 ) -> None:
     """
-    Test that main handles empty data saver configuration.
+    Verify that the main function correctly handles an empty data saver configuration by not creating savers, threads, or logging info messages.
     """
     main(empty_config)
 
@@ -473,7 +408,7 @@ def test_main_processes_config_with_nested_structure(
     mock_init_from_cfg: MockType, mock_thread: MockType
 ) -> None:
     """
-    Test that main correctly extracts saver name and config from nested structure.
+    Test that the main function correctly processes a configuration with nested saver structures, ensuring the saver name and relevant configuration fields are extracted and passed to the saver initializer.
     """
     complex_config = create_config_with_savers(
         {
@@ -508,7 +443,7 @@ def test_main_handles_saver_creation_failure(
     basic_single_saver_config: DictConfig,
 ) -> None:
     """
-    Test handling of data saver creation failure.
+    Verify that `main` logs an error and does not create a thread when data saver creation fails.
     """
     mock_init_from_cfg.return_value = None  # Simulate creation failure
 
@@ -530,7 +465,9 @@ def test_main_handles_mixed_creation_success_failure(
     multi_saver_config: DictConfig,
 ) -> None:
     """
-    Test handling of mixed success and failure in saver creation.
+    Test that `main` logs an error and only creates threads for savers that are successfully created when some saver initializations fail.
+    
+    Verifies that an error is logged for each failed saver creation and that threads are only started for savers that were successfully instantiated.
     """
     saver_names = ["csv_saver", "sqlite_saver", "jsonl_saver"]
     (_, successful_mock_savers, _) = setup_mixed_success_failure_mocks(
@@ -557,7 +494,9 @@ def test_main_handles_all_savers_creation_failure(
     multi_saver_config: DictConfig,
 ) -> None:
     """
-    Test handling when all data saver creations fail.
+    Test that `main` logs errors and does not create threads when all data saver initializations fail.
+    
+    Verifies that an error is logged for each saver and that no threads are started if `init_from_cfg` returns `None` for all savers in the configuration.
     """
     mock_init_from_cfg.return_value = None
 
@@ -582,7 +521,9 @@ def test_main_creates_separate_threads_for_each_saver(
     mock_init_from_cfg: MockType, mock_thread: MockType, multi_saver_config: DictConfig
 ) -> None:
     """
-    Test that separate threads are created for each data saver.
+    Verify that the main function creates a separate thread for each data saver in the configuration.
+    
+    Ensures that the correct number of threads are created and that each thread is initialized with the appropriate target saver.
     """
     saver_names = ["saver_0", "saver_1", "saver_2"]
     mock_savers, _ = setup_multi_saver_mocks(
@@ -610,7 +551,7 @@ def test_main_handles_init_from_cfg_exception(
     basic_single_saver_config: DictConfig,
 ) -> None:
     """
-    Test handling of exceptions during saver initialization.
+    Test that `main` propagates exceptions raised during saver initialization and does not create threads or log info messages in such cases.
     """
     mock_init_from_cfg.side_effect = RuntimeError("Configuration error")
 
@@ -627,7 +568,7 @@ def test_main_continues_after_partial_failures(
     mock_init_from_cfg: MockType, mock_thread: MockType, mock_logger: MockType
 ) -> None:
     """
-    Test that main continues processing after some savers fail.
+    Verify that the main function continues to process and start threads for successfully created savers even if some savers fail to initialize, and logs an error for each failed saver.
     """
     config = create_config_with_savers(
         create_saver_config("good_saver_1"),
@@ -664,7 +605,7 @@ def test_main_logs_info_for_started_savers(
     multi_saver_config: DictConfig,
 ) -> None:
     """
-    Test that info messages are logged for started savers.
+    Verify that the main function logs info messages for each saver that is started when processing a configuration with multiple savers.
     """
     saver_names = ["csv_saver", "sqlite_saver", "jsonl_saver"]
     setup_multi_saver_mocks(mock_init_from_cfg, mock_thread, saver_names)
@@ -682,7 +623,7 @@ def test_main_logs_errors_for_failed_savers(
     multi_saver_config: DictConfig,
 ) -> None:
     """
-    Test that error messages are logged for failed
+    Verify that error messages are logged for each saver that fails to be created and that no threads are started when all saver initializations fail.
     """
     mock_init_from_cfg.return_value = None  # All fail
 
@@ -702,7 +643,9 @@ def test_main_logs_errors_for_failed_savers(
 
 def test_main_end_to_end_multiple_savers() -> None:
     """
-    Test complete end-to-end execution with real thread behavior (multiple savers).
+    Performs an end-to-end test of the main function with multiple savers, verifying concurrent execution in separate threads and correct logging.
+    
+    This test creates three mock savers, tracks their execution and thread IDs, runs the main function with a configuration containing all savers, and asserts that each saver is executed, that execution occurs in multiple threads, and that an info log is generated for each saver.
     """
     config = create_config_with_savers(
         create_saver_config("saver_1"),
@@ -723,6 +666,16 @@ def test_main_end_to_end_multiple_savers() -> None:
             for saver in mock_savers:
 
                 def make_tracked_retrieve(saver_name: str, orig_method):
+                    """
+                    Wraps a data saver retrieval method to track its execution and the thread ID.
+                    
+                    Parameters:
+                        saver_name (str): The name of the saver being tracked.
+                        orig_method (Callable): The original retrieval method to be wrapped.
+                    
+                    Returns:
+                        Callable: A function that, when called, records the saver name and thread ID, then invokes the original method.
+                    """
                     def tracked_retrieve():
                         executed_savers.append(saver_name)
                         execution_threads.append(threading.current_thread().ident)
@@ -753,7 +706,7 @@ def test_main_end_to_end_multiple_savers() -> None:
 
 def test_main_with_realistic_config_structure() -> None:
     """
-    Test with a realistic configuration structure.
+    Verifies that the main function correctly processes a realistic, nested configuration structure with multiple savers, ensuring each saver is initialized with the appropriate configuration and corresponding threads are created.
     """
     realistic_config = OmegaConf.create(
         {

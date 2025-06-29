@@ -47,7 +47,7 @@ from app.utils.asyncio_utils.asyncio_support import (
 @pytest.fixture
 def mock_logger():
     """
-    Mock logger fixture for testing log output.
+    Provides a pytest fixture that yields a mocked logger for capturing and asserting log output during tests.
     """
     with patch("app.utils.asyncio_utils.asyncio_support.logger") as mock:
         yield mock
@@ -56,7 +56,9 @@ def mock_logger():
 @pytest.fixture(autouse=True)
 def clear_global_state():
     """
-    Clear global state before and after each test.
+    Temporarily clears and restores global shutdown and running task state for test isolation.
+    
+    Intended for use as a pytest fixture to ensure that modifications to `_shutdown_tasks` and `_running_tasks` during a test do not affect other tests.
     """
     original_shutdown_tasks = _shutdown_tasks.copy()
     original_running_tasks = _running_tasks.copy()
@@ -75,7 +77,9 @@ def clear_global_state():
 @pytest.fixture(autouse=True)
 def reset_sys_modules():
     """
-    Reset sys.modules state for twisted reactor tests.
+    Context manager that restores the original `sys.modules` state for Twisted-related modules after a test.
+    
+    Removes any Twisted modules added to `sys.modules` during the test, ensuring a clean import state for subsequent tests.
     """
     original_modules = sys.modules.copy()
     yield
@@ -93,8 +97,9 @@ def reset_sys_modules():
 
 def test_asyncio_loop_singleton_creation(mock_logger):
     """
-    Test AsyncioLoop singleton creation and initialization. Verifies that the singleton creates
-    a new loop, sets it as the event loop, sets up exception handling, and logs the creation.
+    Verifies that `AsyncioLoop.get_loop()` creates and initializes a singleton asyncio event loop.
+    
+    Ensures the loop is set as the current event loop, exception handling is configured, and creation is logged.
     """
     # Test first creation
     loop1 = AsyncioLoop.get_loop()
@@ -122,12 +127,17 @@ def test_asyncio_loop_singleton_reuse():
 
 def test_asyncio_loop_thread_safety():
     """
-    Test AsyncioLoop thread safety in concurrent access. Verifies that the singleton
-    behaves correctly when accessed from multiple threads simultaneously.
+    Tests that AsyncioLoop.get_loop() returns the same event loop instance across multiple threads, ensuring singleton thread safety.
     """
     loops = {}
 
     def _get_loop_in_thread(thread_id):
+        """
+        Retrieve and store the singleton asyncio event loop for the specified thread.
+        
+        Parameters:
+            thread_id: Identifier of the thread for which to obtain the event loop.
+        """
         loops[thread_id] = AsyncioLoop.get_loop()
 
     threads = []
@@ -152,8 +162,7 @@ def test_asyncio_loop_thread_safety():
 
 def test_setup_exception_handling():
     """
-    Test _setup_exception_handling function. Verifies that the exception handler
-    is properly set on the event loop.
+    Test that _setup_exception_handling installs a custom exception handler on the event loop.
     """
     loop = asyncio.new_event_loop()
 
@@ -171,13 +180,15 @@ def test_setup_exception_handling():
 
 def test_exception_handler_with_real_exception(mock_logger):
     """
-    Test exception handler behavior with actual exceptions. Verifies that exceptions are
-    properly logged with context information.
+    Tests that the custom exception handler logs errors when a task raises an actual exception, including relevant context information.
     """
     loop = AsyncioLoop.get_loop()
 
     # Create a real task that will raise an exception
     async def failing_task():
+        """
+        Asynchronous task that raises a ValueError to simulate an error condition.
+        """
         raise ValueError("Test error for exception handling")
 
     # Run the task and let it fail
@@ -197,12 +208,14 @@ def test_exception_handler_with_real_exception(mock_logger):
 
 def test_exception_handler_with_cancelled_error(mock_logger):
     """
-    Test exception handler with CancelledError (should not log). Verifies that CancelledError
-    exceptions are ignored as they're normal during shutdown operations.
+    Verifies that the exception handler does not log errors or warnings when handling asyncio.CancelledError, as such exceptions are expected during normal shutdown.
     """
     loop = AsyncioLoop.get_loop()
 
     async def cancelled_task():
+        """
+        An asynchronous task that sleeps for 10 seconds, intended to be cancelled during execution.
+        """
         await asyncio.sleep(10)  # Long sleep to allow cancellation
 
     task = loop.create_task(cancelled_task())
@@ -222,12 +235,14 @@ def test_exception_handler_with_cancelled_error(mock_logger):
 
 def test_exception_handler_context_logging(mock_logger):
     """
-    Test that exception handler logs context information properly. Verifies that task and
-    other context details are included in logs.
+    Tests that the exception handler logs contextual information, including task details, when an exception occurs in an asyncio task.
     """
     loop = AsyncioLoop.get_loop()
 
     async def task_with_context():
+        """
+        Asynchronous task that raises a RuntimeError with a specific error message.
+        """
         raise RuntimeError("Error with context")
 
     loop.create_task(task_with_context(), name="test_task")
@@ -281,8 +296,7 @@ def test_reactor_already_installed_true_when_imported():
 
 def test_reactor_already_installed_handles_import_error():
     """
-    Test _reactor_already_installed handles ImportError gracefully. Verifies that ImportError
-    during reactor import is handled properly.
+    Verify that _reactor_already_installed returns False when an ImportError occurs during reactor import, ensuring graceful handling of import failures.
     """
     # Put something in sys.modules but make import fail
     with patch.dict(sys.modules, {"twisted.internet.reactor": MagicMock()}):
@@ -293,8 +307,9 @@ def test_reactor_already_installed_handles_import_error():
 
 def test_install_twisted_reactor_success(mock_logger):
     """
-    Test successful Twisted reactor installation. Verifies that the reactor is installed
-    correctly when Twisted is available.
+    Test that the Twisted reactor is installed successfully when Twisted is available.
+    
+    Verifies that the reactor's install method is called with the event loop and that appropriate log messages are generated.
     """
     mock_asyncioreactor = MagicMock()
     with patch.dict(
@@ -313,8 +328,7 @@ def test_install_twisted_reactor_success(mock_logger):
 
 def test_install_twisted_reactor_import_error(mock_logger):
     """
-    Test Twisted reactor installation when Twisted is not available.
-    Verifies that ImportError is handled gracefully with appropriate warning.
+    Test that Twisted reactor installation handles ImportError gracefully and logs a warning when Twisted is unavailable.
     """
     loop = AsyncioLoop.get_loop()
 
@@ -331,8 +345,7 @@ def test_install_twisted_reactor_import_error(mock_logger):
 
 def test_install_twisted_reactor_already_installed_error(mock_logger):
     """
-    Test Twisted reactor installation when reactor is already installed. Verifies that
-    ReactorAlreadyInstalledError is handled with warning.
+    Test that installing the Twisted reactor when it is already installed logs a warning and handles the ReactorAlreadyInstalledError gracefully.
     """
     mock_asyncioreactor = MagicMock()
 
@@ -355,8 +368,9 @@ def test_install_twisted_reactor_already_installed_error(mock_logger):
 
 def test_install_twisted_reactor_unexpected_error(mock_logger):
     """
-    Test Twisted reactor installation with unexpected error. Verifies that unexpected
-    errors are logged and re-raised.
+    Test that unexpected exceptions during Twisted reactor installation are logged and re-raised.
+    
+    Verifies that if an unexpected error occurs while installing the Twisted reactor, the error is logged and the exception is propagated.
     """
     mock_asyncioreactor = MagicMock()
 
@@ -381,8 +395,7 @@ def test_install_twisted_reactor_unexpected_error(mock_logger):
 
 def test_install_twisted_reactor_full_success(mock_logger):
     """
-    Test complete install_twisted_reactor function execution. Verifies the full installation
-    process including signal handlers and atexit registration.
+    Tests that the full `install_twisted_reactor` process completes successfully on a Linux platform, including reactor installation, signal handler setup, atexit registration, and appropriate logging.
     """
 
     with patch("app.utils.asyncio_utils.asyncio_support.sys.platform", "linux"):
@@ -407,8 +420,7 @@ def test_install_twisted_reactor_already_installed_skip(
     mock_logger,
 ):
     """
-    Test install_twisted_reactor when reactor is already installed. Verifies that installation
-    is skipped when reactor is already present.
+    Tests that `install_twisted_reactor` skips installation and logs an informational message when the Twisted reactor is already installed.
     """
     mock_reactor_check.return_value = True
     install_twisted_reactor()
@@ -438,8 +450,7 @@ def test_install_twisted_reactor_windows_platform(
     mock_reactor_check,
 ):
     """
-    Test install_twisted_reactor on Windows platform. Verifies that signal handlers are not
-    installed on Windows.
+    Tests that `install_twisted_reactor` installs the Twisted reactor on Windows platforms without setting up signal handlers.
     """
     mock_reactor_check.return_value = False
     sys.modules.pop("pytest_asyncio")
@@ -459,8 +470,7 @@ def test_install_twisted_reactor_windows_platform(
 
 def test_register_shutdown_handler(mock_logger):
     """
-    Test register_shutdown_handler function. Verifies that shutdown handlers are properly
-    registered and logged.
+    Tests that a shutdown handler can be registered and is correctly added to the shutdown handler list, with appropriate debug logging.
     """
 
     def test_handler():
@@ -477,17 +487,25 @@ def test_register_shutdown_handler(mock_logger):
 
 def test_register_multiple_shutdown_handlers():
     """
-    Test registering multiple shutdown handlers. Verifies that multiple handlers can be
-    registered and are stored in order.
+    Test that multiple shutdown handlers can be registered and are stored in the correct order.
     """
 
     def handler1():
+        """
+        A placeholder shutdown handler function for testing purposes.
+        """
         pass
 
     def handler2():
+        """
+        A no-op shutdown handler used for testing purposes.
+        """
         pass
 
     def handler3():
+        """
+        A no-op shutdown handler used for testing purposes.
+        """
         pass
 
     register_shutdown_handler(handler1)
@@ -500,11 +518,15 @@ def test_register_multiple_shutdown_handlers():
 
 def test_register_task_for_cleanup():
     """
-    Test register_task_for_cleanup function. Verifies that tasks are properly registered
-    for cleanup.
+    Tests that tasks registered with `register_task_for_cleanup` are tracked for cleanup and properly removed from tracking upon cancellation and completion.
     """
 
     async def dummy_task():
+        """
+        A simple asynchronous task that sleeps for a short duration.
+        
+        This function is typically used as a placeholder or for testing asynchronous task behavior.
+        """
         await asyncio.sleep(0.1)
 
     loop = AsyncioLoop.get_loop()
@@ -530,11 +552,16 @@ def test_register_task_for_cleanup():
 
 def test_register_task_for_cleanup_auto_removal():
     """
-    Test automatic task removal from cleanup registry when task completes. Verifies that
-    completed tasks are automatically removed from tracking.
+    Test that tasks registered for cleanup are automatically removed from tracking upon completion.
     """
 
     async def quick_task():
+        """
+        Asynchronously returns the string "done".
+        
+        Returns:
+            str: The string "done" upon completion.
+        """
         return "done"
 
     loop = AsyncioLoop.get_loop()
@@ -560,8 +587,7 @@ def test_register_task_for_cleanup_auto_removal():
 @pytest.mark.asyncio
 async def test_shutdown_without_signal(mock_logger):
     """
-    Test shutdown function without signal parameter. Verifies that normal shutdown doesn't
-    call sys.exit.
+    Tests that the shutdown function performs a graceful shutdown without calling sys.exit when no signal is provided.
     """
     with patch("app.utils.asyncio_utils.asyncio_support.sys.exit") as mock_exit:
         await shutdown()
@@ -574,8 +600,7 @@ async def test_shutdown_without_signal(mock_logger):
 @pytest.mark.asyncio
 async def test_shutdown_with_signal(mock_logger):
     """
-    Test shutdown function with signal parameter. Verifies that shutdown with signal logs
-    appropriately and exits.
+    Tests that the shutdown function logs receipt of a signal and calls sys.exit(0) to terminate the process.
     """
     test_signal = signal.SIGTERM
 
@@ -592,12 +617,16 @@ async def test_shutdown_with_signal(mock_logger):
 @pytest.mark.asyncio
 async def test_shutdown_with_real_running_tasks(mock_logger):
     """
-    Test shutdown function with actual running tasks. Verifies that real tasks are properly
-    cancelled during shutdown.
+    Test that the shutdown function cancels running tasks registered for cleanup.
+    
+    Creates real asynchronous tasks, registers them for cleanup, and verifies that they are properly cancelled during shutdown.
     """
 
     # Create real async tasks
     async def long_running_task(_):
+        """
+        Simulates a long-running asynchronous operation by sleeping for one second.
+        """
         await asyncio.sleep(1)
 
     # Create and register tasks
@@ -632,6 +661,9 @@ async def test_shutdown_with_completed_tasks():
     """
 
     async def quick_task():
+        """
+        Asynchronously returns the string "completed".
+        """
         return "completed"
 
     # Create and complete a task
@@ -653,18 +685,28 @@ async def test_shutdown_with_completed_tasks():
 @pytest.mark.asyncio
 async def test_shutdown_with_handlers_lifo_order():
     """
-    Test shutdown function with registered handlers in LIFO order. Verifies that shutdown
-    handlers are called in reverse order (LIFO).
+    Tests that shutdown handlers are executed in last-in-first-out (LIFO) order during shutdown.
+    
+    Verifies that both synchronous and asynchronous handlers registered for shutdown are called in reverse order of registration.
     """
     call_order = []
 
     def handler1():
+        """
+        Appends 'handler1' to the call_order list to record its invocation.
+        """
         call_order.append("handler1")
 
     def handler2():
+        """
+        Appends the string "handler2" to the call_order list to record invocation order during tests.
+        """
         call_order.append("handler2")
 
     async def async_handler():
+        """
+        Asynchronous shutdown handler that appends its identifier to the call order list.
+        """
         call_order.append("async_handler")
 
     # Register handlers in order
@@ -681,16 +723,23 @@ async def test_shutdown_with_handlers_lifo_order():
 @pytest.mark.asyncio
 async def test_shutdown_handler_exception_handling(mock_logger):
     """
-    Test shutdown function when handler raises exception. Verifies that exceptions in shutdown
-    handlers are logged but don't stop shutdown.
+    Tests that the shutdown process continues and logs errors when a registered shutdown handler raises an exception.
+    
+    Verifies that all shutdown handlers are executed regardless of exceptions, and that errors from failing handlers are properly logged.
     """
     call_order = []
 
     def failing_handler():
+        """
+        A shutdown handler that appends its name to the call order and raises a ValueError to simulate a handler failure.
+        """
         call_order.append("failing_handler")
         raise ValueError("Handler error")
 
     def working_handler():
+        """
+        Appends 'working_handler' to the call_order list to track execution order during tests.
+        """
         call_order.append("working_handler")
 
     register_shutdown_handler(working_handler)  # This should still run
@@ -713,11 +762,16 @@ async def test_shutdown_handler_exception_handling(mock_logger):
 @pytest.mark.asyncio
 async def test_shutdown_async_handler_exception(mock_logger):
     """
-    Test shutdown with async handler that raises exception. Verifies that async handler
-    exceptions are properly caught and logged.
+    Tests that exceptions raised by asynchronous shutdown handlers during shutdown are caught and logged as errors.
     """
 
     async def failing_async_handler():
+        """
+        Asynchronous handler that raises a RuntimeError when executed.
+        
+        Raises:
+            RuntimeError: Always raised with the message "Async handler error".
+        """
         raise RuntimeError("Async handler error")
 
     register_shutdown_handler(failing_async_handler)
@@ -732,12 +786,18 @@ async def test_shutdown_async_handler_exception(mock_logger):
 @pytest.mark.asyncio
 async def test_shutdown_task_wait_timeout(mock_logger):
     """
-    Test shutdown with task cancellation timeout. Verifies that timeout during task wait is
-    handled gracefully.
+    Test that shutdown handles errors during task cancellation waiting gracefully.
+    
+    Simulates a scenario where an exception occurs while waiting for tasks to cancel during shutdown, and verifies that the error is logged.
     """
 
     # Create a task that won't respond to cancellation quickly
     async def stubborn_task():
+        """
+        Simulates an asyncio task that is slow to respond to cancellation.
+        
+        This task sleeps for a period, and if cancelled, deliberately delays its cancellation handling by sleeping again.
+        """
         try:
             await asyncio.sleep(10)
         except asyncio.CancelledError:
@@ -785,8 +845,7 @@ def test_install_twisted_reactor_import_error_handling(
     mock_logger,
 ):
     """
-    Test install_twisted_reactor ImportError handling. Verifies that ImportError for Twisted is
-    handled gracefully.
+    Test that `install_twisted_reactor` handles ImportError gracefully and logs a warning when Twisted is unavailable.
     """
     mock_reactor_check.return_value = False
     mock_install.side_effect = ImportError("No Twisted module")
@@ -806,8 +865,9 @@ def test_install_twisted_reactor_unexpected_error_handling(
     mock_logger,
 ):
     """
-    Test install_twisted_reactor unexpected error handling. Verifies that unexpected errors during
-    reactor installation are logged.
+    Test that unexpected errors during Twisted reactor installation are logged as errors.
+    
+    This test simulates a runtime error during reactor installation and verifies that the error is logged appropriately.
     """
     mock_reactor_check.return_value = False
     mock_install.side_effect = RuntimeError("Unexpected error")
@@ -821,8 +881,7 @@ def test_install_twisted_reactor_unexpected_error_handling(
 
 def test_exception_handler_edge_cases(mock_logger):
     """
-    Test exception handler with various edge cases. Verifies robustness of exception handling
-    with unusual contexts.
+    Tests the event loop's exception handler with minimal and unusual context inputs to ensure it handles edge cases without errors.
     """
     loop = asyncio.new_event_loop()
     _setup_exception_handling(loop)
@@ -847,8 +906,7 @@ def test_exception_handler_edge_cases(mock_logger):
 @pytest.mark.asyncio
 async def test_shutdown_empty_state(mock_logger):
     """
-    Test shutdown with no registered tasks or handlers. Verifies that shutdown works correctly
-    with empty state.
+    Tests that the shutdown process completes successfully when no tasks or shutdown handlers are registered.
     """
     assert len(_shutdown_tasks) == 0
     assert len(_running_tasks) == 0
@@ -861,12 +919,19 @@ async def test_shutdown_empty_state(mock_logger):
 
 def test_register_task_for_cleanup_edge_cases():
     """
-    Test task registration edge cases. Verifies robustness of task registration with various
-    task states.
+    Test registration of tasks for cleanup with completed and cancelled states.
+    
+    Verifies that tasks which are already completed or cancelled can still be registered for cleanup and are tracked appropriately.
     """
 
     # Test with already completed task
     async def completed_task():
+        """
+        An asynchronous function that immediately returns the string "done".
+        
+        Returns:
+            str: The string "done".
+        """
         return "done"
 
     loop = asyncio.new_event_loop()
@@ -878,6 +943,11 @@ def test_register_task_for_cleanup_edge_cases():
 
     # Test with cancelled task
     async def cancelled_task():
+        """
+        An asynchronous task that sleeps for 10 seconds.
+        
+        Intended for use in tests where the task may be cancelled before completion.
+        """
         await asyncio.sleep(10)
 
     task2 = loop.create_task(cancelled_task())
@@ -914,8 +984,7 @@ def test_multiple_asyncio_loop_instances_isolation():
 
 def test_signal_handler_integration():
     """
-    Test signal handler setup and integration. Verifies that signal handlers are properly
-    configured to use fire_and_forgot.
+    Verifies that signal handlers are set up during Twisted reactor installation and that the integration completes without errors.
     """
     with patch(
         "app.utils.asyncio_utils.asyncio_support._reactor_already_installed",

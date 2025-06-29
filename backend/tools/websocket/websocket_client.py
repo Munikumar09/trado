@@ -26,7 +26,13 @@ logger.info("Using Python version: %s", sys.version)
 
 async def connect_and_subscribe(uri, stocks):
     """
-    Connects to the WebSocket server, subscribes to stocks, and listens for messages.
+    Continuously connects to a WebSocket server, subscribes to specified stock tokens, and processes incoming messages.
+    
+    Parameters:
+        uri (str): The WebSocket server URI.
+        stocks (list): List of stock token strings to subscribe to.
+    
+    The function attempts to maintain a persistent connection, automatically reconnecting on disconnections or errors. It sends subscription requests for each stock token and handles incoming messages based on their type, including stock updates, errors, and subscription acknowledgments. Connection errors and invalid URIs are logged, and the function waits before retrying failed connections.
     """
     while True:  # Keep trying to reconnect
         try:
@@ -126,7 +132,9 @@ async def connect_and_subscribe(uri, stocks):
 
 async def main():
     """
-    Main function to parse arguments and start the WebSocket client.
+    Parses command-line arguments and starts the asynchronous WebSocket client for stock data subscriptions.
+    
+    This function processes the server URI and stock tokens provided via command-line arguments, converts stock tokens to uppercase, and initiates the connection and subscription process.
     """
     parser = argparse.ArgumentParser(description="WebSocket client for stock data.")
     # Change the default URI to remove the /ws path

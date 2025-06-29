@@ -26,22 +26,15 @@ formats = [
 @lru_cache(maxsize=128)
 def parse_timestamp(timestamp_str: str) -> datetime | None:
     """
-    Parses a timestamp string into a timezone-aware UTC datetime object with format caching.
-    Handles various ISO formats and Unix timestamps (seconds and milliseconds).
-
-    Parameters
-    ----------
-    timestamp_str: ``str``
-        The timestamp string to parse, which can be in various formats:
-        - ISO 8601 format with or without timezone
-        - Space-separated date and time
-        - Unix timestamp in seconds or milliseconds
-
-    Returns
-    -------
-    datetime: ``datetime | None``
-        A timezone-aware UTC datetime object if parsing is successful,
-        None if the timestamp cannot be parsed with any known format
+    Parse a timestamp string into a timezone-aware UTC datetime object.
+    
+    Attempts multiple ISO 8601 and space-separated datetime formats, with or without microseconds and timezone information. If no format matches, tries to interpret the string as a Unix timestamp in seconds or milliseconds. Returns None if parsing fails.
+     
+    Parameters:
+        timestamp_str (str): The timestamp string to parse, supporting ISO 8601, space-separated formats, or Unix timestamps.
+    
+    Returns:
+        datetime | None: A UTC-aware datetime object if parsing succeeds, otherwise None.
     """
     dt = None
     for fmt in formats:
@@ -89,27 +82,22 @@ class CacheUpdateError(Exception):
 
 
 def _should_update(current_timestamp, new_timestamp):
+    """
+    Determine whether the cache should be updated based on timestamp comparison.
+    
+    Returns True if there is no current timestamp or if the new timestamp is more recent than the current one.
+    """
     return current_timestamp is None or new_timestamp > current_timestamp
 
 
 def _validate_inputs(cache_key: str, cache_data: dict) -> tuple[bool, str]:
     """
-    Validates the inputs for cache update operation.
-    Checks if the cache key and data are valid, and if the timestamp is present.
-    Returns a tuple indicating whether the inputs are valid and the timestamp string.
-
-    Parameters
-    ----------
-    cache_key: ``str``
-        The Redis key under which the stock data is stored
-    cache_data: ``dict``
-        The stock data to cache, which must include 'last_traded_timestamp' field
-
-    Returns
-    -------
-    ``tuple[bool, str]``
-        A tuple where the first element is a boolean indicating if the inputs are valid,
-        and the second element is the timestamp string or an error message
+    Validate cache key and data for a cache update operation.
+    
+    Checks that the cache key is a non-empty string, the cache data is a dictionary, and that it contains a 'last_traded_timestamp' field.
+    
+    Returns:
+        tuple[bool, str]: A tuple where the first element is True and the second is the timestamp string if validation succeeds; otherwise, False and an error message indicating the validation failure.
     """
     if not cache_key or not isinstance(cache_key, str):
         logger.error("Invalid cache key provided")
@@ -125,6 +113,11 @@ def _validate_inputs(cache_key: str, cache_data: dict) -> tuple[bool, str]:
 
 
 def _extract_current_timestamp(current_data_str, cache_key):
+    """
+    Extracts and parses the current timestamp from cached JSON data.
+    
+    Attempts to decode the provided JSON string, retrieve the 'last_traded_timestamp' field, and parse it into a UTC datetime object. Returns a tuple containing the parsed datetime (or None if unavailable) and the original timestamp string.
+    """
     current_timestamp = None
     current_timestamp_str = None
     if current_data_str:
@@ -151,35 +144,15 @@ async def update_stock_cache(
     cache_key: str, cache_data: dict, redis_client=None
 ) -> bool:
     """
-    Updates the stock data cache using atomic check-and-set operation.
-
-    Updates the Redis cache for a stock if the new data has a more recent timestamp.
-    Uses Redis transaction to ensure atomic operations and prevent race conditions.
-    Adds metadata such as processing timestamp and cache update time to the stored data.
-
-    Parameters
-    ----------
-    cache_key: ``str``
-        The Redis key under which the stock data is stored, typically prefixed with
-        a channel identifier.
-    cache_data: ``dict``
-        The stock data to cache, which must include 'last_traded_timestamp' field.
-        Other fields are preserved as-is in the cache.
-    redis_client: ``redis.asyncio.Redis | None``
-        Optional Redis client to use for the operation. If not provided,
-        a new connection will be created from the global connection pool.
-
-    Returns
-    -------
-    ``bool``
-        True if the cache was updated successfully (i.e., data was newer),
-        False if update was skipped (validation failure, older timestamp, or race condition)
-
-    Raises
-    ------
-    ``CacheUpdateError``
-        If there's a serious error that prevents cache updating beyond simple validation
-        failures, such as Redis connection issues or JSON serialization problems
+    Atomically updates stock data in the Redis cache if the new data has a more recent timestamp.
+    
+    Validates input, parses timestamps, and uses a Redis transaction with optimistic locking to ensure the cache is only updated if the new data is newer than the existing cached data. Adds metadata fields for processing and cache update times in UTC ISO 8601 format. Returns True if the cache was updated, or False if the update was skipped due to validation failure, older timestamp, or concurrent modification.
+    
+    Returns:
+        bool: True if the cache was updated, False if skipped.
+    
+    Raises:
+        CacheUpdateError: If a Redis connection error, JSON serialization issue, or other serious failure occurs.
     """
     valid, timestamp_str = _validate_inputs(cache_key, cache_data)
 
@@ -262,29 +235,15 @@ async def update_stock_cache(
 
 async def get_stock_data(stock_name: str) -> dict[str, Any] | None:
     """
-    Retrieves the latest stock data from the Redis cache.
-
-    Fetches stock data by constructing a cache key from the stock name
-    and retrieving the corresponding JSON data from Redis.
-
-    Parameters
-    ----------
-    stock_name: ``str``
-        The name/symbol of the stock to retrieve from the cache
-        (e.g., "RELIANCE", "INFY")
-
-    Returns
-    -------
-    data: ``dict[str, Any] | None``
-        A dictionary containing the latest stock data including price,
-        timestamp, and other relevant fields if found in the cache.
-        None if the stock data is not in the cache or the stock name is invalid.
-
-    Raises
-    ------
-    ``CacheUpdateError``
-        If there's a serious error accessing Redis or parsing the cache data,
-        such as connection issues or invalid JSON format
+    Retrieve the latest stock data for a given stock name from the Redis cache.
+    
+    Attempts to fetch and parse the cached JSON data for the specified stock. Returns the data as a dictionary if found, or None if the stock is not present or the name is invalid.
+    
+    Returns:
+        dict[str, Any] | None: Parsed stock data dictionary if available, otherwise None.
+    
+    Raises:
+        CacheUpdateError: If a Redis connection error, JSON decoding error, or other serious retrieval issue occurs.
     """
     if not stock_name or not isinstance(stock_name, str):
         logger.error("Invalid stock name provided")

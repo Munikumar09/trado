@@ -34,6 +34,14 @@ class BrevoEmailProvider(EmailProvider):
 
     def __init__(self, sender_name: str, sender_email: str, brevo_api_key_name) -> None:
 
+        """
+        Initializes the BrevoEmailProvider with sender details and Brevo API configuration.
+        
+        Parameters:
+            sender_name (str): Name of the sender as an environment variable key.
+            sender_email (str): Email address of the sender as an environment variable key.
+            brevo_api_key_name: Environment variable key for the Brevo API key.
+        """
         self.configuration = brevo_python.Configuration()
         self.configuration.api_key["api-key"] = get_env_var(brevo_api_key_name)
         self.sender_name = get_env_var(sender_name)
@@ -43,16 +51,15 @@ class BrevoEmailProvider(EmailProvider):
         self, code: str, recipient_email: str, recipient_name: str
     ) -> None:
         """
-        This method is used to send the verification code to the user's email.
-
+        Sends a verification code email to the specified recipient using the Brevo transactional email service.
+        
         Parameters:
-        ----------
-        code: ``str``
-            The verification code that will be sent to the user's email
-        recipient_email: ``str``
-            The email address to which the verification code will be sent
-        recipient_name: ``str``
-            The name of the receiver
+            code (str): The verification code to include in the email.
+            recipient_email (str): The recipient's email address.
+            recipient_name (str): The recipient's name.
+        
+        Raises:
+            HTTPException: If the email fails to send due to an API error.
         """
         subject = "Verify your email"
         sender = {"name": self.sender_name, "email": self.sender_email}

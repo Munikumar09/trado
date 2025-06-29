@@ -73,8 +73,7 @@ def test_user():
 # Test: 1
 def test_create_user(session, test_user):
     """
-    Test creating a new user.
-    Ensures `create_user` adds a user to the database.
+    Tests that a new user can be created and retrieved, and that attempting to create a duplicate user raises an HTTPException.
     """
     create_user(test_user, session=session)
 

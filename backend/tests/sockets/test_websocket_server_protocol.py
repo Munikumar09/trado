@@ -28,9 +28,7 @@ from app.sockets.websocket_server_protocol import (
 @pytest.fixture
 def mock_connection_manager():
     """
-    Fixture providing a mock ConnectionManager for testing. Returns a mock instance that
-    simulates the ConnectionManager interface without requiring actual Redis or WebSocket
-    connections.
+    Pytest fixture that returns a mock ConnectionManager instance for isolated testing without real Redis or WebSocket connections.
     """
     mock_manager = MagicMock(spec=ConnectionManager)
     return mock_manager
@@ -39,8 +37,10 @@ def mock_connection_manager():
 @pytest.fixture
 def mock_logger():
     """
-    Fixture providing a mock logger for testing log output. Mocks the module-level logger
-    to verify logging calls and messages during protocol building operations.
+    Pytest fixture that provides a mocked module-level logger for verifying log output during tests.
+    
+    Yields:
+        MagicMock: The patched logger instance for asserting logging calls and messages.
     """
     with patch("app.sockets.websocket_server_protocol.logger") as mock:
         yield mock
@@ -49,8 +49,7 @@ def mock_logger():
 @pytest.fixture
 def sample_factory(mock_connection_manager):
     """
-    Fixture providing a StockTickerServerFactory instance for testing. Creates a factory with
-    a mock connection manager and test URL for consistent testing across all test functions.
+    Provides a StockTickerServerFactory instance initialized with a mock connection manager and test URL for use in tests.
     """
     url = "ws://localhost:8080"
     factory = StockTickerServerFactory(url, mock_connection_manager)
@@ -60,9 +59,7 @@ def sample_factory(mock_connection_manager):
 @pytest.fixture
 def sample_addresses():
     """
-    Fixture providing various address formats for testing. Returns different address types that
-    might be passed to buildProtocol to ensure robust handling of various client connection
-    scenarios.
+    Provides a list of sample client address strings in various formats for use in parameterized tests of protocol building.
     """
     return [
         "127.0.0.1:12345",
@@ -105,9 +102,7 @@ def test_factory_initialization_with_valid_connection_manager(
 
 def test_factory_initialization_with_none_connection_manager(mock_logger):
     """
-    Test factory initialization failure with None connection manager. Verifies that passing
-    None as connection_manager raises ValueError with appropriate error message and no info
-    logging occurs.
+    Test that initializing StockTickerServerFactory with a None connection manager raises a ValueError and does not log any info messages.
     """
     url = "ws://localhost:8080"
 
@@ -130,12 +125,9 @@ def test_factory_initialization_with_none_connection_manager(mock_logger):
 
 def test_build_protocol_success_with_valid_address(sample_factory, mock_logger):
     """
-    Test successful protocol building with valid address.
-
-    Verifies that buildProtocol correctly:
-    - Calls parent buildProtocol method
-    - Assigns connection_manager to the protocol
-    - Logs debug messages for both building and initialization
+    Test that buildProtocol successfully creates a protocol with a valid address, assigns the connection manager, and emits the expected debug logs.
+    
+    Ensures the parent buildProtocol is called, the returned protocol receives the factory's connection manager, and both building and initialization debug messages are logged.
     """
 
     # Create mock protocol with connection_manager attribute
@@ -184,8 +176,9 @@ def test_build_protocol_success_with_valid_address(sample_factory, mock_logger):
 )
 def test_build_protocol_with_various_addresses(sample_factory, mock_logger, addr):
     """
-    Test buildProtocol with various address formats. Verifies that the method works correctly
-    with different types of client addresses that might be encountered in real usage.
+    Test that buildProtocol correctly handles and logs various client address formats.
+    
+    Verifies that the protocol receives the factory's connection manager and that debug logs are emitted for each address type.
     """
     mock_protocol = MagicMock(spec=StockTickerServerProtocol)
     mock_protocol.connection_manager = None
@@ -211,8 +204,7 @@ def test_build_protocol_connection_manager_assignment_verification(
     sample_factory, mock_connection_manager
 ):
     """
-    Test that connection_manager is properly assigned to protocol. Verifies the core functionality
-    of assigning the factory's connection_manager to the newly created protocol instance.
+    Verifies that the factory's connection manager is correctly assigned to the protocol instance created by buildProtocol.
     """
     mock_protocol = MagicMock(spec=StockTickerServerProtocol)
     mock_protocol.connection_manager = None
@@ -236,9 +228,7 @@ def test_build_protocol_connection_manager_assignment_verification(
 
 def test_build_protocol_when_parent_returns_none(sample_factory, mock_logger):
     """
-    Test buildProtocol when parent buildProtocol returns None. Verifies that when the parent
-    method returns None (connection refused), the method handles it gracefully without attempting
-    attribute assignment.
+    Test that buildProtocol returns None and skips connection manager assignment when the parent buildProtocol method returns None.
     """
     with patch.object(
         sample_factory.__class__.__bases__[0], "buildProtocol"
@@ -271,9 +261,9 @@ def test_build_protocol_without_connection_manager_attribute(
     sample_factory, mock_logger
 ):
     """
-    Test buildProtocol when protocol doesn't have connection_manager attribute. Verifies that
-    protocols without connection_manager attribute are handled gracefully without attempting
-    assignment or raising AttributeError.
+    Test that buildProtocol handles protocols lacking a connection_manager attribute without error.
+    
+    Verifies that if the protocol returned by the parent buildProtocol method does not have a connection_manager attribute, the method does not attempt assignment or raise an AttributeError, and only the building debug log is emitted.
     """
     # Create mock protocol without connection_manager attribute
     mock_protocol = MagicMock()
@@ -308,9 +298,7 @@ def test_build_protocol_with_protocol_having_existing_connection_manager(
     sample_factory, mock_logger
 ):
     """
-    Test buildProtocol when protocol already has a connection_manager. Verifies that existing
-    connection_manager values are properly overwritten with the factory's connection_manager
-    instance.
+    Tests that buildProtocol overwrites any existing connection_manager on the protocol with the factory's connection_manager and emits the expected debug logs.
     """
     # Create mock protocol with existing connection_manager
     existing_manager = MagicMock()
@@ -349,8 +337,7 @@ def test_build_protocol_with_protocol_having_existing_connection_manager(
 
 def test_build_protocol_debug_logging_format(sample_factory, mock_logger):
     """
-    Test that debug logging uses correct format strings and arguments. Verifies the exact format
-    and content of debug log messages to ensure proper monitoring and debugging capabilities.
+    Verify that `buildProtocol` emits debug log messages with the correct format strings and arguments, ensuring logging output matches expected monitoring and debugging standards.
     """
     mock_protocol = MagicMock(spec=StockTickerServerProtocol)
     mock_protocol.connection_manager = None
@@ -377,9 +364,7 @@ def test_build_protocol_debug_logging_format(sample_factory, mock_logger):
 
 def test_build_protocol_no_info_or_error_logging(sample_factory, mock_logger):
     """
-    Test that buildProtocol only uses debug logging, not info/warning/error. Verifies that
-    normal protocol building operations don't generate higher-level log messages that might
-    clutter logs.
+    Verify that buildProtocol emits only debug log messages and does not generate info, warning, error, exception, or critical logs during normal protocol creation.
     """
     mock_protocol = MagicMock(spec=StockTickerServerProtocol)
     mock_protocol.connection_manager = None
@@ -408,9 +393,7 @@ def test_build_protocol_parent_method_exception_propagation(
     sample_factory, mock_logger
 ):
     """
-    Test that exceptions from parent buildProtocol are properly propagated. Verifies that errors
-    in the parent WebSocketServerFactory.buildProtocol method are not caught and suppressed by
-    our implementation.
+    Verify that exceptions raised by the parent buildProtocol method are propagated and not caught, and that the building debug log is emitted before the exception.
     """
     with patch.object(
         sample_factory.__class__.__bases__[0], "buildProtocol"
@@ -430,9 +413,7 @@ def test_build_protocol_parent_method_exception_propagation(
 
 def test_build_protocol_hasattr_check_safety(sample_factory, mock_logger):
     """
-    Test that hasattr check safely handles protocols with __getattr__ methods. Verifies that
-    the hasattr check doesn't trigger unexpected behavior in protocols that might have custom
-    attribute access methods.
+    Tests that the `buildProtocol` method safely handles protocols whose `__getattr__` method raises exceptions when checking for the `connection_manager` attribute, ensuring no unexpected errors occur and only the appropriate debug log is emitted.
     """
 
     # Create mock protocol with custom __getattr__ that raises exception
@@ -443,7 +424,7 @@ def test_build_protocol_hasattr_check_safety(sample_factory, mock_logger):
 
         def __getattr__(self, name):
             """
-            Custom __getattr__ that raises an exception for a specific attribute.
+            Raises an AttributeError with a custom message when accessing the 'connection_manager' attribute; otherwise, delegates attribute access to the superclass.
             """
             if name == "connection_manager":
                 raise AttributeError("Custom getattr error")
@@ -470,8 +451,7 @@ def test_build_protocol_hasattr_check_safety(sample_factory, mock_logger):
 
 def test_build_protocol_multiple_consecutive_calls(sample_factory, mock_logger):
     """
-    Test multiple consecutive calls to buildProtocol. Verifies that the method works correctly
-    when called multiple times in succession, which would happen with multiple client connections.
+    Tests that multiple consecutive calls to buildProtocol correctly assign the connection manager to each protocol instance, emit the expected debug logs, and delegate to the parent method for each client address.
     """
     addresses = ["127.0.0.1:12345", "192.168.1.100:8080", "10.0.0.1:3000"]
     protocols = []
@@ -501,8 +481,7 @@ def test_build_protocol_multiple_consecutive_calls(sample_factory, mock_logger):
 
 def test_build_protocol_with_none_address(sample_factory, mock_logger):
     """
-    Test buildProtocol with None address. Verifies that None addresses are handled gracefully
-    and passed to the parent method without causing issues in our implementation.
+    Test that buildProtocol correctly handles a None address by passing it to the parent method, assigning the connection manager, and emitting appropriate debug logs.
     """
     addr = None
     mock_protocol = MagicMock(spec=StockTickerServerProtocol)

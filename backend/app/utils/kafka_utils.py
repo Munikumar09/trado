@@ -9,19 +9,19 @@ def get_kafka_consumer(
     topic: str | None = None,
 ) -> Consumer:
     """
-    Create and return a Kafka consumer with the provided configuration.
-
-    Parameters
-    ----------
-    config: ``dict[str, Any]``
-        Configuration settings for the Kafka consumer
-    topic: ``str | None``
-        The Kafka topic to subscribe to
-
-    Returns
-    -------
-    consumer: ``Consumer``
-        A configured Kafka consumer instance
+    Creates and returns a Kafka consumer instance using the provided configuration.
+    
+    If a topic is specified, the consumer is subscribed to that topic. Raises a `KafkaException` if consumer creation or subscription fails.
+    
+    Parameters:
+        config (dict[str, Any]): Configuration settings for the Kafka consumer.
+        topic (str | None): Optional Kafka topic to subscribe to.
+    
+    Returns:
+        Consumer: Configured Kafka consumer instance.
+    
+    Raises:
+        KafkaException: If consumer creation or subscription fails.
     """
     try:
         consumer = Consumer(config)
