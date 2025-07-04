@@ -71,20 +71,3 @@ def sample_instrument_price(sample_instrument_price_data) -> InstrumentPrice:
         total_buy_quantity="500",
         total_sell_quantity="500",
     )
-
-
-@pytest.fixture(autouse=True)
-def create_insert_sample_data(session, sample_instrument, sample_instrument_price):
-    """
-    Insert sample data into the database
-    """
-    bse_instrument = Instrument(
-        **sample_instrument.model_dump(),
-    )
-    bse_instrument.exchange_id = ExchangeType.BSE.value
-    bse_instrument.token = "1020"
-
-    session.add(bse_instrument)
-    session.add(sample_instrument)
-    session.add(sample_instrument_price)
-    session.commit()

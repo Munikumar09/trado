@@ -73,7 +73,7 @@ def get_env_var(name: str, default: str | None = None) -> str:
     -----------
     name: ``str``
         Name of the environment variable to fetch
-    default: ``str`` (default = None)
+    default: ``str | None`` (default = None)
         Default value to return if the environment variable is not found.
         If not provided, a ValueError will be raised if the variable is missing.
 

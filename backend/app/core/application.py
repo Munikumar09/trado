@@ -1,6 +1,5 @@
 # --- Standard Library Imports ---
 import asyncio
-import sys
 from pathlib import Path
 
 # --- Third-Party Imports ---
@@ -18,7 +17,6 @@ from app.data_layer.streaming.consumers.kafka_consumer import KafkaConsumer
 from app.sockets.websocket_server_manager import ConnectionManager, RedisPubSubManager
 from app.sockets.websocket_server_protocol import StockTickerServerFactory
 from app.utils.asyncio_utils.asyncio_support import (
-    AsyncioLoop,
     install_twisted_reactor,
     register_shutdown_handler,
     register_task_for_cleanup,
@@ -37,7 +35,6 @@ load_dotenv()
 
 # --- Install Twisted Reactor Safely ---
 install_twisted_reactor()
-LOOP = AsyncioLoop.get_loop()
 
 # --- Try Import Twisted ---
 try:
@@ -121,6 +118,77 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+def _start_websocket_listening(ws_host: str, ws_port: int, factory) -> bool:
+    """
+    Start the WebSocket server listening on the specified host and port.
+
+    Parameters
+    ----------
+    ws_host: ``str``
+        The host to bind the WebSocket server to
+    ws_port: ``int``
+        The port to bind the WebSocket server to
+    factory: ``StockTickerServerFactory``
+        The factory instance for creating WebSocket protocols
+
+    Returns
+    -------
+    ``bool``
+        True if listening started successfully, False otherwise.
+    """
+    listen_tcp = getattr(reactor, "listenTCP", None)
+    if listen_tcp is not None:
+        AppState.websocket_server_port = listen_tcp(ws_port, factory, interface=ws_host)
+        AppState.websocket_server_running = True
+        logger.info("WebSocket server started on ws://%s:%d", ws_host, ws_port)
+        return True
+
+    logger.error(
+        "Twisted reactor does not support listenTCP; WebSocket server not started."
+    )
+    return False
+
+
+async def _initialize_websocket_server():
+    """
+    Initialize and start the WebSocket server if Twisted is available.
+
+    Returns
+    -------
+    ``bool``
+        True if WebSocket server was started successfully, False otherwise.
+    """
+    if not (TWISTED_AVAILABLE and reactor):
+        logger.warning("Twisted unavailable. WebSocket server not started.")
+        return False
+
+    try:
+        ws_host = get_env_var("WEBSOCKET_HOST")
+        ws_port = int(get_env_var("WEBSOCKET_PORT"))
+
+        if ws_port == 8000:
+            raise ValueError("WebSocket port cannot be the same as FastAPI port (8000)")
+
+        # Initialize managers
+        pubsub_manager = RedisPubSubManager(AppState.redis_client)
+        AppState.connection_manager = ConnectionManager(pubsub_manager)
+
+        # Register cleanup handlers
+        register_shutdown_handler(pubsub_manager.close)
+        register_shutdown_handler(AppState.connection_manager.close)
+
+        factory = StockTickerServerFactory(
+            f"ws://{ws_host}:{ws_port}",
+            AppState.connection_manager,
+        )
+
+        return _start_websocket_listening(ws_host, ws_port, factory)
+
+    except Exception as e:
+        logger.error("Failed to start WebSocket server: %s", e, exc_info=True)
+        return False
+
+
 @app.on_event("startup")
 async def startup_event():
     """
@@ -151,6 +219,7 @@ async def startup_event():
         logger.info("Request rate limiter initialized")
 
         kafka_consumer = KafkaConsumer()
+        AppState.kafka_consumer = kafka_consumer
         AppState.kafka_consumer_task = fire_and_forgot(
             kafka_consumer.consume_messages()
         )
@@ -158,55 +227,94 @@ async def startup_event():
         logger.info("Kafka consumer started")
 
         # Start WebSocket Server if Twisted is available
-        if TWISTED_AVAILABLE and reactor:
-            try:
-                ws_host = get_env_var("WEBSOCKET_HOST")
-                ws_port = int(get_env_var("WEBSOCKET_PORT"))
-
-                if ws_port == 8000:
-                    raise ValueError(
-                        "WebSocket port cannot be the same as FastAPI port (8000)"
-                    )
-
-                # Initialize managers
-                pubsub_manager = RedisPubSubManager(AppState.redis_client)
-                AppState.connection_manager = ConnectionManager(pubsub_manager)
-
-                # Register cleanup handlers
-                register_shutdown_handler(pubsub_manager.close)
-                register_shutdown_handler(AppState.connection_manager.close)
-
-                factory = StockTickerServerFactory(
-                    f"ws://{ws_host}:{ws_port}",
-                    AppState.connection_manager,
-                )
-
-                # Start listening
-                listen_tcp = getattr(reactor, "listenTCP", None)
-                if listen_tcp is not None:
-                    AppState.websocket_server_port = listen_tcp(
-                        ws_port, factory, interface=ws_host
-                    )
-                    AppState.websocket_server_running = True
-                    logger.info(
-                        "WebSocket server started on ws://%s:%d", ws_host, ws_port
-                    )
-                else:
-                    logger.error(
-                        "Twisted reactor does not support listenTCP; WebSocket server not started."
-                    )
-
-            except Exception as e:
-                logger.error("Failed to start WebSocket server: %s", e, exc_info=True)
-        else:
-            logger.warning("Twisted unavailable. WebSocket server not started.")
+        await _initialize_websocket_server()
 
         AppState.startup_complete = True
         logger.info("%s startup completed successfully", SERVICE_NAME)
 
     except Exception as e:
         logger.critical("Fatal error during startup: %s", e, exc_info=True)
-        sys.exit(1)
+        raise e  # Re-raise to ensure the application does not start
+
+
+async def _shutdown_websocket_server():
+    """
+    Stop the WebSocket server if it's currently running.
+
+    Returns
+    -------
+    ``bool``
+        True if WebSocket server was stopped successfully or wasn't running, False if error occurred.
+    """
+    if not (
+        TWISTED_AVAILABLE
+        and AppState.websocket_server_port
+        and AppState.websocket_server_running
+    ):
+        return True
+
+    try:
+        logger.info("Stopping WebSocket server...")
+        stop_deferred = AppState.websocket_server_port.stopListening()
+        if stop_deferred:
+            # Wait for up to 5 seconds for the server to stop
+            try:
+                await asyncio.wait_for(
+                    asyncio.ensure_future(stop_deferred), timeout=5.0
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Timed out waiting for WebSocket server to stop")
+        logger.info("WebSocket server stopped")
+        return True
+    except Exception as e:
+        logger.error("Error stopping WebSocket server: %s", e, exc_info=True)
+        return False
+    finally:
+        AppState.websocket_server_port = None
+        AppState.websocket_server_running = False
+
+
+async def _shutdown_kafka_consumer():
+    """
+    Stop the Kafka consumer and clean up related resources.
+
+    Returns
+    -------
+    ``bool``
+        True if Kafka consumer was stopped successfully or wasn't running, False if error occurred.
+    """
+    # Stop Kafka Consumer
+    if AppState.kafka_consumer:
+        AppState.kafka_consumer.stop()
+
+    if not (AppState.kafka_consumer_task and not AppState.kafka_consumer_task.done()):
+        return True
+
+    logger.info("Stopping Kafka consumer...")
+    try:
+        # First, try to wait for graceful completion
+        await asyncio.wait_for(AppState.kafka_consumer_task, timeout=5.0)
+        logger.info("Kafka consumer stopped")
+        return True
+    except asyncio.TimeoutError:
+        logger.warning("Timed out waiting for Kafka consumer to stop")
+
+        # Cancel the task if it didn't stop gracefully
+        AppState.kafka_consumer_task.cancel()
+        try:
+            await AppState.kafka_consumer_task
+        except asyncio.CancelledError:
+            logger.info("Kafka consumer task cancelled")
+        return True
+    except asyncio.CancelledError:
+        logger.info("Kafka consumer task cancelled")
+        return True
+    except Exception as e:
+        logger.error("Error during Kafka task shutdown: %s", e, exc_info=True)
+        return False
+    finally:
+        AppState.kafka_consumer_task = None
+        AppState.kafka_consumer = None
 
 
 @app.on_event("shutdown")
@@ -219,56 +327,17 @@ async def shutdown_event():
     - Cancels Kafka consumer task
     - Closes Redis connections and all managed resources
     """
+    await RedisAsyncConnection().close_connection()  # Close Redis connection pool
+
     if not AppState.startup_complete:
         logger.info("Shutdown called before startup completed")
 
     logger.info("Application shutting down, cleaning up resources...")
 
     # Stop WebSocket Server
-    if (
-        TWISTED_AVAILABLE
-        and AppState.websocket_server_port
-        and AppState.websocket_server_running
-    ):
-        try:
-            logger.info("Stopping WebSocket server...")
-            stop_deferred = AppState.websocket_server_port.stopListening()
-            if stop_deferred:
-                # Wait for up to 5 seconds for the server to stop
-                try:
-                    await asyncio.wait_for(
-                        asyncio.ensure_future(stop_deferred), timeout=5.0
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning("Timed out waiting for WebSocket server to stop")
-            logger.info("WebSocket server stopped")
-        except Exception as e:
-            logger.error("Error stopping WebSocket server: %s", e, exc_info=True)
-        finally:
-            AppState.websocket_server_port = None
-            AppState.websocket_server_running = False
+    await _shutdown_websocket_server()
 
     # Stop Kafka Consumer
-    if AppState.kafka_consumer_task and not AppState.kafka_consumer_task.done():
-        logger.info("Stopping Kafka consumer...")
-        try:
-            # First, try to wait for graceful completion
-            await asyncio.wait_for(AppState.kafka_consumer_task, timeout=5.0)
-            logger.info("Kafka consumer stopped")
-        except asyncio.TimeoutError:
-            logger.warning("Timed out waiting for Kafka consumer to stop")
-
-            # Cancel the task if it didn't stop gracefully
-            AppState.kafka_consumer_task.cancel()
-            try:
-                await AppState.kafka_consumer_task
-            except asyncio.CancelledError:
-                logger.info("Kafka consumer task cancelled")
-        except asyncio.CancelledError:
-            logger.info("Kafka consumer task cancelled")
-        except Exception as e:
-            logger.error("Error during Kafka task shutdown: %s", e, exc_info=True)
-        finally:
-            AppState.kafka_consumer_task = None
+    await _shutdown_kafka_consumer()
 
     logger.info("%s shutdown complete", SERVICE_NAME)

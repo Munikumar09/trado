@@ -697,12 +697,10 @@ def test_retrieve_and_save_kafka_error(
     saver = create_saver_with_temp_db(mock_consumer, basic_config)
 
     # Create message with error
-    error_message = MockMessage(
-        value=None,
-        error_obj=lambda: KafkaError(
-            KafkaError._MSG_TIMED_OUT  # pylint: disable= protected-access
-        ),
+    kafka_error = KafkaError(
+        KafkaError._MSG_TIMED_OUT  # pylint: disable=protected-access
     )
+    error_message = MockMessage(value=None, error_obj=kafka_error)
     mock_consumer.poll.return_value = error_message
 
     with pytest.raises(KafkaException):
@@ -859,7 +857,7 @@ def test_database_connection_error() -> None:
     mock_consumer = MagicMock()
 
     # Use invalid database path that would cause connection issues
-    with pytest.raises(Exception):  # Could be various database-related exceptions
+    with pytest.raises((OSError, PermissionError)):
         # Try to create saver with read-only path
         SqliteDataSaver(mock_consumer, "/root/invalid/path/test.sqlite3")
 

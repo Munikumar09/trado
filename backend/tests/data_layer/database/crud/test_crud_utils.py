@@ -28,6 +28,24 @@ from app.data_layer.database.models import Instrument, InstrumentPrice
 from app.utils.common.types.financial_types import DataProviderType, ExchangeType
 from app.utils.constants import INSERTION_BATCH_SIZE
 
+
+@pytest.fixture(autouse=True)
+def create_insert_sample_data(session, sample_instrument, sample_instrument_price):
+    """
+    Insert sample data into the database
+    """
+    bse_instrument = Instrument(
+        **sample_instrument.model_dump(),
+    )
+    bse_instrument.exchange_id = ExchangeType.BSE.value
+    bse_instrument.token = "1020"
+
+    session.add(bse_instrument)
+    session.add(sample_instrument)
+    session.add(sample_instrument_price)
+    session.commit()
+
+
 #################### HELPER FUNCTIONS ####################
 
 
@@ -162,9 +180,6 @@ def verify_record_data(record: SQLModel, expected_data: Dict[str, Any]) -> None:
         ), f"Expected {key}={expected_value}, got {actual_value}"
 
 
-#################### TESTS ####################
-
-
 def validate_pre_upsert_data(
     upsert_data: List[Dict[str, Any]], model: Type[SQLModel], session: Session
 ) -> None:
@@ -228,6 +243,9 @@ def validate_post_insert_or_ignore_data(
             assert result.model_dump() == previous_data[idx].model_dump()  # type: ignore[union-attr]
         else:
             assert result.model_dump() == data
+
+
+#################### TESTS ####################
 
 
 # fmt: off

@@ -463,10 +463,11 @@ def test_retrieve_and_save_file_permission_error(
     saver.retrieve_and_save()
 
     error_calls = mock_logger.error.call_args_list
-    assert (
-        "call('Error while saving data to jsonl: %s', PermissionError('Permission denied'))"
-        == str(error_calls[0])
-    )
+    assert len(error_calls) == 1
+    assert error_calls[0][0][0] == "Error while saving data to jsonl: %s"
+    assert isinstance(error_calls[0][0][1], PermissionError)
+    assert str(error_calls[0][0][1]) == "Permission denied"
+    mock_consumer.close.assert_called_once()
     mock_consumer.close.assert_called_once()
 
 
@@ -567,7 +568,6 @@ def test_retrieve_and_save_unicode_content(mock_consumer, basic_config):
 
     # Verify Unicode content is properly handled
     records = read_jsonl(saver.jsonl_file_path)
-    print(records)
 
     assert records[0] == message_data
 

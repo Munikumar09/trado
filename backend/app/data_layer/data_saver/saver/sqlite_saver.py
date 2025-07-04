@@ -16,7 +16,10 @@ from app.data_layer.database.db_connections.sqlite import (
 )
 from app.data_layer.database.models import InstrumentPrice
 from app.utils.common.logger import get_logger
-from app.utils.constants import KAFKA_CONSUMER_DEFAULT_CONFIG, KAFKA_CONSUMER_GROUP_ID
+from app.utils.constants import (
+    KAFKA_CONSUMER_DEFAULT_CONFIG,
+    KAFKA_CONSUMER_GROUP_ID_ENV,
+)
 from app.utils.kafka_utils import get_kafka_consumer
 
 logger = get_logger(Path(__file__).name)
@@ -128,7 +131,7 @@ class SqliteDataSaver(DataSaver):
         consumer = get_kafka_consumer(
             {
                 "bootstrap.servers": cfg.streaming.kafka_server,
-                "group.id": KAFKA_CONSUMER_GROUP_ID,
+                "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
                 **KAFKA_CONSUMER_DEFAULT_CONFIG,
             },
             cfg.streaming.kafka_topic,

@@ -10,7 +10,10 @@ from omegaconf import DictConfig
 
 from app.data_layer.data_saver.data_saver import DataSaver
 from app.utils.common.logger import get_logger
-from app.utils.constants import KAFKA_CONSUMER_DEFAULT_CONFIG, KAFKA_CONSUMER_GROUP_ID
+from app.utils.constants import (
+    KAFKA_CONSUMER_DEFAULT_CONFIG,
+    KAFKA_CONSUMER_GROUP_ID_ENV,
+)
 from app.utils.kafka_utils import get_kafka_consumer
 
 logger = get_logger(Path(__file__).name)
@@ -50,9 +53,14 @@ class CSVDataSaver(DataSaver):
         Retrieve the data from the kafka consumer and save it to the csv file.
         """
         idx = 0
+
         try:
             with open(self.csv_file_path, "a", encoding="utf-8", newline="") as file:
                 writer = csv.writer(file)
+
+                # Check if file is empty before writing headers
+                file_is_empty = file.tell() == 0
+
                 while True:
                     data = self.consumer.poll(timeout=1.0)
                     if not data:
@@ -64,8 +72,10 @@ class CSVDataSaver(DataSaver):
                     message = data.value().decode("utf-8")
                     decoded_data = json.loads(message)
 
-                    if idx == 0:
+                    if idx == 0 and file_is_empty:
                         writer.writerow(list(decoded_data.keys()))
+                        file_is_empty = False
+
                     writer.writerow(list(decoded_data.values()))
                     idx += 1
 
@@ -91,7 +101,7 @@ class CSVDataSaver(DataSaver):
         consumer = get_kafka_consumer(
             {
                 "bootstrap.servers": cfg.streaming.kafka_server,
-                "group.id": KAFKA_CONSUMER_GROUP_ID,
+                "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
                 **KAFKA_CONSUMER_DEFAULT_CONFIG,
             },
             cfg.streaming.kafka_topic,

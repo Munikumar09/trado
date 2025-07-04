@@ -17,9 +17,9 @@ from app.utils.common.logger import get_logger
 from app.utils.common.types.financial_types import DataProviderType, ExchangeType
 from app.utils.constants import (
     CHANNEL_PREFIX,
-    KAFKA_BROKER_URL,
-    KAFKA_CONSUMER_GROUP_ID,
-    KAFKA_TOPIC_INSTRUMENT,
+    KAFKA_BROKER_URL_ENV,
+    KAFKA_CONSUMER_GROUP_ID_ENV,
+    KAFKA_TOPIC_INSTRUMENT_ENV,
 )
 from app.utils.fetch_data import get_env_var
 from app.utils.redis_utils import RedisAsyncConnection
@@ -91,9 +91,9 @@ class KafkaConsumer(Consumer):
             Additional Kafka consumer configuration. If provided, these settings
             will override the default configuration values.
         """
-        self.topic = topic or get_env_var(KAFKA_TOPIC_INSTRUMENT)
-        self.group_id = group_id or get_env_var(KAFKA_CONSUMER_GROUP_ID)
-        self.brokers = brokers or get_env_var(KAFKA_BROKER_URL)
+        self.topic = topic or get_env_var(KAFKA_TOPIC_INSTRUMENT_ENV)
+        self.group_id = group_id or get_env_var(KAFKA_CONSUMER_GROUP_ID_ENV)
+        self.brokers = brokers or get_env_var(KAFKA_BROKER_URL_ENV)
         self.config = {**DEFAULT_CONFIG, **(config or {})}
 
         # Create thread pool for blocking Kafka operations
@@ -295,7 +295,6 @@ class KafkaConsumer(Consumer):
 
         consecutive_errors = 0
         last_success_time = time.time()
-        print("Kafka consumer started")
 
         try:
             loop = asyncio.get_running_loop()

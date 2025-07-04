@@ -528,49 +528,49 @@ async def test_startup_event_critical_failures(mock_external_dependencies, mock_
     """
     deps = mock_external_dependencies
 
+    error_msg = "Redis connection failed"
     # Test Redis connection failure
-    deps["redis"]["connection"].get_connection.side_effect = ConnectionError(
-        "Redis connection failed"
-    )
+    deps["redis"]["connection"].get_connection.side_effect = ConnectionError(error_msg)
 
-    with patch("app.core.application.sys.exit") as mock_exit:
+    with pytest.raises(ConnectionError) as exc_info:
         await startup_event()
-        mock_logger.critical.assert_called_with(
-            "Fatal error during startup: %s",
-            deps["redis"]["connection"].get_connection.side_effect,
-            exc_info=True,
-        )
-        mock_exit.assert_called_once_with(1)
+
+    assert str(exc_info.value) == error_msg
+    mock_logger.critical.assert_called_with(
+        "Fatal error during startup: %s",
+        deps["redis"]["connection"].get_connection.side_effect,
+        exc_info=True,
+    )
 
     # Reset mocks and test database failure
     mock_logger.reset_mock()
-    mock_exit.reset_mock()
+    error_msg = "Database initialization failed"
     deps["redis"]["connection"].get_connection.side_effect = None
-    deps["create_db"].side_effect = RuntimeError("Database initialization failed")
+    deps["create_db"].side_effect = RuntimeError(error_msg)
 
-    with patch("app.core.application.sys.exit") as mock_exit:
+    with pytest.raises(RuntimeError) as exc_info:
         await startup_event()
-        mock_logger.critical.assert_called_with(
-            "Fatal error during startup: %s",
-            deps["create_db"].side_effect,
-            exc_info=True,
-        )
-        mock_exit.assert_called_once_with(1)
+    assert str(exc_info.value) == error_msg
+    mock_logger.critical.assert_called_with(
+        "Fatal error during startup: %s",
+        deps["create_db"].side_effect,
+        exc_info=True,
+    )
 
     # Reset mocks and test Kafka failure
     mock_logger.reset_mock()
-    mock_exit.reset_mock()
+    error_msg = "Kafka consumer failed"
     deps["create_db"].side_effect = None
     deps["kafka"]["class"].side_effect = RuntimeError("Kafka consumer failed")
 
-    with patch("app.core.application.sys.exit") as mock_exit:
+    with pytest.raises(RuntimeError) as exc_info:
         await startup_event()
-        mock_logger.critical.assert_called_with(
-            "Fatal error during startup: %s",
-            deps["kafka"]["class"].side_effect,
-            exc_info=True,
-        )
-        mock_exit.assert_called_once_with(1)
+    assert str(exc_info.value) == error_msg
+    mock_logger.critical.assert_called_with(
+        "Fatal error during startup: %s",
+        deps["kafka"]["class"].side_effect,
+        exc_info=True,
+    )
 
 
 # =============================================================================
@@ -1045,7 +1045,6 @@ def test_module_imports_and_structure():
     assert hasattr(app_module, "startup_event")
     assert hasattr(app_module, "shutdown_event")
     assert hasattr(app_module, "logger")
-    assert hasattr(app_module, "LOOP")
 
     # Verify environment loading and feature flags
     assert hasattr(app_module, "load_dotenv")

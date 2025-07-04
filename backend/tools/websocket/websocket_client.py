@@ -1,9 +1,10 @@
-# pylint: disable = no-member too-many-branches
+# pylint: disable = no-member too-many-branches too-many-statements
 
 import argparse
 import asyncio
 import json
 import logging
+import random
 
 # Import sys for Python version
 import sys
@@ -28,34 +29,28 @@ async def connect_and_subscribe(uri, stocks):
     """
     Connects to the WebSocket server, subscribes to stocks, and listens for messages.
     """
-    while True:  # Keep trying to reconnect
+    max_retries = 10
+    retry_count = 0
+    base_delay = 1
+    max_delay = 60
+    while retry_count < max_retries:
         try:
-            # NOTE: Temporarily removed extra_headers for debugging the TypeError
-            # If this connects (and likely gets 403), the issue is specific to header passing.
-            # If the TypeError persists, the issue is deeper.
-            # async with websockets.connect(uri, extra_headers=headers) as websocket:
+            # Add connection timeout
             async with websockets.connect(
-                uri
-            ) as websocket:  # Connect without headers for now
-                # If connection succeeds without headers, it will likely fail later or get 403 from server.
-                # This is just to test the TypeError source.
-                logger.info(
-                    "Connected to WebSocket server at %s (without extra_headers for testing)",
-                    uri,
-                )
-
+                uri, ping_interval=20, ping_timeout=10, close_timeout=10
+            ) as websocket:
+                retry_count = 0  # Reset on successful connection
+                logger.info("Connected to WebSocket server at %s", uri)
                 # Subscribe to specified stocks
                 for stock in stocks:
                     subscribe_message = {"action": "subscribe", "stocks": stock}
                     await websocket.send(json.dumps(subscribe_message))
                     logger.info("Sent subscription request for: %s", stock)
-
                 # Listen for incoming messages
                 while True:
                     try:
                         message_str = await websocket.recv()
                         message = json.loads(message_str)
-
                         # Optional: Add specific handling based on message type
                         if message.get("type") == "stock_update":
                             # Process stock update data
@@ -75,7 +70,6 @@ async def connect_and_subscribe(uri, stocks):
                                 message.get("stock"),
                             )
                         # Add handling for other message types if needed
-
                     except websockets.exceptions.ConnectionClosedOK:
                         logger.info("WebSocket connection closed normally.")
                         break  # Exit inner loop to reconnect
@@ -89,15 +83,12 @@ async def connect_and_subscribe(uri, stocks):
                             "An error occurred while processing a message: %s", e
                         )
                         # Decide if you want to break or continue on other errors
-
         except websockets.exceptions.InvalidStatusCode as e:
             # Log specific HTTP errors like 403
             logger.error(
                 "Server rejected connection: HTTP %s. Check URI, headers, and server logs.",
                 e.status_code,
             )
-            # If you get 403 here, it means removing extra_headers allowed the connection attempt
-            # but the server requires the header (e.g., Origin).
             if e.status_code == 403:
                 logger.error(
                     "HTTP 403 Forbidden - Likely requires Origin header (removed for testing TypeError)."
@@ -106,22 +97,23 @@ async def connect_and_subscribe(uri, stocks):
         except websockets.exceptions.InvalidURI:
             logger.error("Invalid WebSocket URI: %s", uri)
             break  # Stop if URI is fundamentally wrong
-        except ConnectionRefusedError:
+        except (ConnectionRefusedError, websockets.exceptions.InvalidStatusCode) as e:
+            retry_count += 1
+            if retry_count >= max_retries:
+                logger.error("Max retries exceeded. Giving up.")
+                break
+            # Exponential backoff with jitter
+            delay = min(base_delay * (2**retry_count) + random.uniform(0, 1), max_delay)
             logger.error(
-                "Connection refused by server at %s. Retrying in 5 seconds...", uri
+                "Connection failed (attempt %d/%d). Retrying in %.2f seconds...",
+                retry_count,
+                max_retries,
+                delay,
             )
+            await asyncio.sleep(delay)
         except Exception as e:
-            # Check if the TypeError still occurs even without extra_headers
-            if "unexpected keyword argument 'extra_headers'" in str(e):
-                logger.error(
-                    "FATAL: Still got TypeError regarding 'extra_headers' even when "
-                    "not passing it. Check environment/installation."
-                )
-            logger.error(
-                "Failed to connect or unexpected error: %s. Retrying in 5 seconds...", e
-            )
-
-        await asyncio.sleep(5)  # Wait before retrying connection
+            logger.error("Unexpected error: %s", e)
+            break
 
 
 async def main():

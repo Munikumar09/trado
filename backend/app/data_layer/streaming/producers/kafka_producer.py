@@ -134,10 +134,12 @@ class KafkaProducer(Producer):
                 callback=self.delivery_report,
             )
             # Triggers callbacks for previously sent messages
-            messages_remaining = self.kafka_producer.poll(0)
+            self.kafka_producer.poll(0)
 
             # If queue is starting to fill up, flush some messages
-            if messages_remaining > 10000:
+            messages_remaining = len(self.kafka_producer)
+
+            if messages_remaining > 10_000:
                 logger.info(
                     "Large producer queue (%d messages), flushing...",
                     messages_remaining,

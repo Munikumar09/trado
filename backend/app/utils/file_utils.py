@@ -175,8 +175,12 @@ def read_jsonl(file_path: str | Path) -> list:
     """
     json_data = []
     with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            json_data.append(json.loads(line))
+        for line_num, line in enumerate(f, 1):
+            try:
+                json_data.append(json.loads(line.strip()))
+            except json.JSONDecodeError as e:
+                logger.warning("Skipping invalid JSON on line %d: %s", line_num, e)
+                continue
 
     return json_data
 

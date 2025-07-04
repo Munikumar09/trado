@@ -9,7 +9,10 @@ from omegaconf import OmegaConf
 
 from app.data_layer.data_saver.saver.csv_saver import CSVDataSaver, DataSaver
 from app.utils.common import init_from_cfg
-from app.utils.constants import KAFKA_CONSUMER_DEFAULT_CONFIG, KAFKA_CONSUMER_GROUP_ID
+from app.utils.constants import (
+    KAFKA_CONSUMER_DEFAULT_CONFIG,
+    KAFKA_CONSUMER_GROUP_ID_ENV,
+)
 from app.utils.file_utils import read_csv
 
 #################### FIXTURES ####################
@@ -238,7 +241,7 @@ def test_from_cfg_kafka_config_construction(
 
     expected_config = {
         "bootstrap.servers": "localhost:9092",
-        "group.id": KAFKA_CONSUMER_GROUP_ID,
+        "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
         **KAFKA_CONSUMER_DEFAULT_CONFIG,
     }
     mock_get_kafka_consumer.assert_called_once_with(expected_config, "test_topic")
@@ -476,6 +479,7 @@ def test_retrieve_and_save_different_message_structures(mock_consumer, sample_cs
     assert rows[0] == list(message_data[0].keys())
     assert rows[1] == list(map(str, message_data[0].values()))
     assert rows[2] == list(map(str, message_data[1].values()))
+    assert rows[0] != list(message_data[1].keys())
 
 
 def test_retrieve_and_save_unicode_content(mock_consumer, sample_csv_path):

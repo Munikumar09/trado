@@ -30,21 +30,20 @@ def _done_callback(
     """
     try:
         # Check if the task has an exception
-        if task.exception():
+        exc = task.exception()
+        if exc:
             if error_callback:
-                # Use custom error handler if provided
-                error_callback(task.exception())
+                error_callback(exc)
             else:
                 # Default error logging
-                exception = task.exception()
-                logger.error("Unhandled exception in background task: %s", exception)
+                logger.error("Unhandled exception in background task: %s", exc)
 
                 # Get the task's stack trace for better debugging
                 # type(exception) is always a type, but exception could be None
                 # So, guard against None before calling format_exception
-                if exception is not None:
+                if exc is not None:
                     task_tb = traceback.format_exception(
-                        type(exception), exception, exception.__traceback__
+                        type(exc), exc, exc.__traceback__
                     )
                     logger.error("".join(task_tb))
     except asyncio.CancelledError:

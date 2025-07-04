@@ -13,8 +13,26 @@ WS_PID=$!
 sleep 10
 
 # 3) start your server
-python main.py &
+python main.py >/tmp/server.log 2>&1 &
 SERVER_PID=$!
+
+# Wait for server to start
+echo "Waiting for server to start..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+until curl -s http://localhost:8000/health >/dev/null || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+	echo "Waiting for server... ($RETRY_COUNT/$MAX_RETRIES)"
+	sleep 1
+	RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+	echo "Server failed to start in time"
+	cleanup
+	exit 1
+fi
+
+echo "Server is ready"
 
 # 4) cleanup on exit
 cleanup() {

@@ -18,26 +18,23 @@ logger = get_logger(Path(__file__).name)
 
 class RedisPubSubError(Exception):
     """
-    Base exception for Redis PubSub related errors.
-
-    Serves as the parent class for all custom exceptions related to
-    Redis Pub/Sub operations, providing a common exception type
-    that can be caught to handle all Redis Pub/Sub specific errors.
+    Base exception for Redis PubSub related errors. Serves as the parent class for all
+    custom exceptions related to Redis Pub/Sub operations, providing a common exception
+    type that can be caught to handle all Redis Pub/Sub specific errors.
     """
 
 
 class RedisPubSubManager(metaclass=Singleton):
     """
-    Manages Redis Pub/Sub functionality, allowing for subscription and unsubscription to channels.
-
-    Handles incoming messages and invokes callbacks for subscribed channels.
-    Implements monitoring for channel activity and automatically unsubscribes
-    from inactive channels to conserve resources.
+    Manages Redis Pub/Sub functionality, allowing for subscription and unsubscription to
+    channels. Handles incoming messages and invokes callbacks for subscribed channels.
+    Implements monitoring for channel activity and automatically unsubscribes from inactive
+    channels to conserve resources.
 
     Attributes
     ----------
     redis: ``Redis``
-        The Redis client instance to use for Pub/Sub operations.
+        The Redis client instance to use for Pub/Sub operations
     """
 
     def __init__(self, redis: Redis):
@@ -53,30 +50,28 @@ class RedisPubSubManager(metaclass=Singleton):
         self, channel: str, callback: Callable[[str, str], Coroutine]
     ) -> bool:
         """
-        Subscribes to a Redis channel and sets a callback.
-
-        Creates a separate task to listen for messages on the channel
-        and invoke the callback when a message is received. Tracks
+        Subscribes to a Redis channel and sets a callback. Creates a separate task to listen
+        for messages on the channel and invoke the callback when a message is received. Tracks
         channel activity for monitoring purposes.
 
         Parameters
         ----------
         channel: ``str``
-            The Redis channel to subscribe to.
+            The Redis channel to subscribe to
         callback: ``Callable[[str, str], Coroutine]``
-            The callback function to invoke when a message is received on the channel.
+            The callback function to invoke when a message is received on the channel
 
         Returns
         -------
         ``bool``
-            True if subscription was successful, False if already subscribed.
+            True if subscription was successful, False if already subscribed
 
         Raises
         ------
         ``ValueError``
-            If the channel name is invalid.
+            If the channel name is invalid
         ``RedisPubSubError``
-            If there's an error subscribing to the channel.
+            If there's an error subscribing to the channel
         """
         if not channel or not isinstance(channel, str):
             raise ValueError("Invalid channel name provided.")
@@ -117,18 +112,16 @@ class RedisPubSubManager(metaclass=Singleton):
 
     def _handle_task_done(self, channel: str, task: asyncio.Task):
         """
-        Handle cleanup when a listener task completes.
-
-        Manages resource cleanup for completed tasks, whether they
-        completed normally, were cancelled, or failed with an exception.
-        This prevents resource leaks from abandoned tasks.
+        Handle cleanup when a listener task completes. Manages resource cleanup for
+        completed tasks, whether they completed normally, were cancelled, or failed
+        with an exception. This prevents resource leaks from abandoned tasks.
 
         Parameters
         ----------
         channel: ``str``
-            The Redis channel associated with the completed task.
+            The Redis channel associated with the completed task
         task: ``asyncio.Task``
-            The completed asyncio task object.
+            The completed asyncio task object
         """
         if channel in self.tasks and self.tasks[channel] == task:
             if task.cancelled():
@@ -152,20 +145,19 @@ class RedisPubSubManager(metaclass=Singleton):
 
     async def unsubscribe(self, channel: str) -> bool:
         """
-        Unsubscribes from a Redis channel and cleans up associated resources.
-
-        Cancels the task listening to the channel and removes all related
-        tracking information from the manager's data structures.
+        Unsubscribes from a Redis channel and cleans up associated resources. Cancels the
+        task listening to the channel and removes all related tracking information from
+        the manager's data structures.
 
         Parameters
         ----------
         channel: ``str``
-            The Redis channel to unsubscribe from.
+            The Redis channel to unsubscribe from
 
         Returns
         -------
         ``bool``
-            True if unsubscription was successful, False if not subscribed.
+            True if unsubscription was successful, False if not subscribed
         """
         if channel not in self.subscribed_channels:
             logger.debug("Not subscribed to %s, nothing to unsubscribe", channel)
@@ -203,48 +195,41 @@ class RedisPubSubManager(metaclass=Singleton):
         self, channel: str, callback: Callable[[str, str], Coroutine]
     ):
         """
-        Listens for messages on a Redis channel and invokes callbacks.
-
-        Creates a Redis PubSub subscription and continuously listens for
-        messages, invoking the provided callback when messages are received.
-        Handles cancellation and cleanup gracefully.
+        Listens for messages on a Redis channel and invokes callbacks. Creates a Redis
+        PubSub subscription and continuously listens for messages, invoking the provided
+        callback when messages are received. Handles cancellation and cleanup gracefully.
 
         Parameters
         ----------
         channel: ``str``
-            The Redis channel to listen to.
+            The Redis channel to listen to
         callback: ``Callable[[str, str], Coroutine]``
-            The callback function to invoke when a message is received on the channel.
-
-        Returns
-        -------
-        None
+            The callback function to invoke when a message is received on the channel
         """
         pubsub = self.redis.pubsub()
-
         try:
             await pubsub.subscribe(channel)
             logger.info("Listening for messages on channel: %s", channel)
 
             async for message in pubsub.listen():
                 if message["type"] == "message":
+
                     # Update last activity time
                     self.channel_activity[channel] = time.time()
-
                     try:
-                        await callback(channel, message["data"])
+                        data = message["data"]
+                        if isinstance(data, bytes):
+                            data = data.decode("utf-8")
+                        await callback(channel, data)
                     except Exception as e:
                         logger.error("Error in callback for channel %s: %s", channel, e)
                         # Continue listening despite callback errors
-
         except asyncio.CancelledError:
             logger.info("Listener for channel %s was cancelled", channel)
             raise  # Re-raise to properly handle task cancellation
-
         except Exception as e:
             logger.error("Error in listener for channel %s: %s", channel, e)
             raise  # Re-raise to mark the task as failed
-
         finally:
             try:
                 await pubsub.unsubscribe(channel)
@@ -255,11 +240,9 @@ class RedisPubSubManager(metaclass=Singleton):
 
     async def close(self):
         """
-        Close all subscriptions and clean up resources.
-
-        Gracefully shuts down all channel subscriptions and cleans up
-        associated resources. This should be called during application
-        shutdown to ensure proper cleanup.
+        Close all subscriptions and clean up resources. Gracefully shuts down all channel
+        subscriptions and cleans up associated resources. This should be called during
+        application shutdown to ensure proper cleanup.
         """
         logger.info("Closing all Redis PubSub subscriptions")
 
@@ -272,16 +255,14 @@ class RedisPubSubManager(metaclass=Singleton):
 
 class ConnectionManager(metaclass=Singleton):
     """
-    Manages WebSocket connections and subscriptions for stock updates.
-
-    Handles client connections, disconnections, and subscription management.
-    Implements rate limiting, connection monitoring, and efficient
-    message broadcasting to subscribed clients.
+    Manages WebSocket connections and subscriptions for stock updates. Handles client
+    connections, disconnections, and subscription management. Implements rate limiting,
+    connection monitoring, and efficient  message broadcasting to subscribed clients.
 
     Attributes
     ----------
     pubsub_manager: ``RedisPubSubManager``
-        The RedisPubSubManager instance to use for managing Redis Pub/Sub.
+        The RedisPubSubManager instance to use for managing Redis Pub/Sub
     """
 
     def __init__(self, pubsub_manager: RedisPubSubManager):
@@ -295,19 +276,18 @@ class ConnectionManager(metaclass=Singleton):
 
     def _get_client_id(self, client: WebSocketServerProtocol) -> str:
         """
-        Returns the client ID based on the client's connection.
-
-        Uses the peer property of the WebSocketServerProtocol to
-        create a unique identifier for each client connection.
+        Returns the client ID based on the client's connection. Uses the peer property
+        of the WebSocketServerProtocol to create a unique identifier for each client
+        connection.
 
         Parameters
         ----------
         client: ``WebSocketServerProtocol``
-            The WebSocket client connection.
+            The WebSocket client connection
         Returns
         -------
         ``str``
-            The unique client ID.
+            The unique client ID
         """
         return client.peer
 
@@ -318,7 +298,7 @@ class ConnectionManager(metaclass=Singleton):
         Parameters
         ----------
         client: ``WebSocketServerProtocol``
-            The WebSocket client connection.
+            The WebSocket client connection
         """
 
         client_id = self._get_client_id(client)
@@ -336,12 +316,12 @@ class ConnectionManager(metaclass=Singleton):
         Parameters
         ----------
         client: ``WebSocketServerProtocol``
-            The WebSocket client connection.
+            The WebSocket client connection
 
         Raises
         ------
         ``KeyError``
-            If the client ID is not found in the active connections.
+            If the client ID is not found in the active connections
         """
         client_id = self._get_client_id(client)
 
@@ -372,16 +352,16 @@ class ConnectionManager(metaclass=Singleton):
 
     async def redis_callback(self, channel: str, message: str):
         """
-        Callback function to handle incoming messages from Redis channel.
-        This function is called when a message is received on a subscribed channel.
-        It decodes the message and broadcasts it to all subscribers of the channel.
+        Callback function to handle incoming messages from Redis channel. This function is
+        called when a message is received on a subscribed channel. It decodes the message
+        and broadcasts it to all subscribers of the channel.
 
         Parameters
         ----------
         channel: ``str``
-            The Redis channel that received the message.
+            The Redis channel that received the message
         message: ``str``
-            The actual message received from the Redis channel.
+            The actual message received from the Redis channel
         """
         try:
             payload = json.loads(message)
@@ -395,22 +375,22 @@ class ConnectionManager(metaclass=Singleton):
     async def handle_subscribe(self, client: WebSocketServerProtocol, stock_token: str):
         """
         Handles a subscription request from a client. This method is called when a client
-        sends a subscription request for a specific stock token. It subscribes the client to
-        the stock token and sends an acknowledgment message back to the client.
+        sends a subscription request for a specific stock token. It subscribes the client
+        to the stock token and sends an acknowledgment message back to the client.
 
         Parameters
         ----------
         client: ``WebSocketServerProtocol``
-            The WebSocket client connection.
+            The WebSocket client connection
         stock_token: ``str``
-            The stock token to subscribe to.
+            The stock token to subscribe to
 
         Raises
         ------
         ``KeyError``
-            If the client ID is not found in the active connections.
+            If the client ID is not found in the active connections
         ``ValueError``
-            If the stock token is invalid or empty.
+            If the stock token is invalid or empty
         """
         client_id = self._get_client_id(client)
 
@@ -446,7 +426,7 @@ class ConnectionManager(metaclass=Singleton):
 
         # Fetch the latest stock data from the cache and send it to the client. This ensures
         # that the client receives the most recent data immediately after subscribing.
-        current_data = await get_stock_data(stock_token)
+        current_data = await get_stock_data(stock_token, self.pubsub_manager.redis)
 
         if current_data:
             await self.send_personal_message(
@@ -474,16 +454,16 @@ class ConnectionManager(metaclass=Singleton):
         Parameters
         ----------
         client: ``WebSocketServerProtocol``
-            The WebSocket client connection.
+            The WebSocket client connection
         stock_token: ``str``
-            The stock token to unsubscribe from.
+            The stock token to unsubscribe from
 
         Raises
         ------
         ``KeyError``
-            If the client ID is not found in the active connections.
+            If the client ID is not found in the active connections
         ``ValueError``
-            If the stock token is invalid or empty.
+            If the stock token is invalid or empty
         """
         client_id = self._get_client_id(client)
 
@@ -529,9 +509,9 @@ class ConnectionManager(metaclass=Singleton):
         Parameters
         ----------
         message: ``Dict[str, Any]``
-            The message to be sent to the client.
+            The message to be sent to the client
         client: ``WebSocketServerProtocol``
-            The WebSocket client connection.
+            The WebSocket client connection
         """
 
         try:
@@ -551,9 +531,9 @@ class ConnectionManager(metaclass=Singleton):
         Parameters
         ----------
         stock_token: ``str``
-            The stock token to broadcast the message to.
+            The stock token to broadcast the message to
         data: ``Dict[str, Any]``
-            The data to be sent to the subscribers.
+            The data to be sent to the subscribers
         """
         stock_token = stock_token.upper()
         if stock_token not in self.subscriptions:

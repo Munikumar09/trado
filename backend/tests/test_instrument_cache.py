@@ -214,7 +214,7 @@ async def test_update_stock_cache_invalid() -> None:
     r = await redis_connection.get_connection()
 
     # Invalid input
-    result = await instrument_cache.update_stock_cache(None, {})  # type: ignore[arg-type]
+    result = await instrument_cache.update_stock_cache(None, {}, r)  # type: ignore[arg-type]
     assert not result
 
     # Invalid timestamp
@@ -258,18 +258,18 @@ async def test_get_stock_data() -> None:
     await r.delete(cache_key)
 
     # Not found
-    result = await instrument_cache.get_stock_data(stock_name)
+    result = await instrument_cache.get_stock_data(stock_name, r)
     assert result is None
 
     # Insert and get
     data = {"foo": 1, "last_traded_timestamp": VALID_TIMESTAMP}
     await r.set(cache_key, json.dumps(data))
-    result = await instrument_cache.get_stock_data(stock_name)
+    result = await instrument_cache.get_stock_data(stock_name, r)
     assert result is not None
     assert result["foo"] == 1
 
     # Invalid stock name
-    result = await instrument_cache.get_stock_data(None)  # type: ignore[arg-type]
+    result = await instrument_cache.get_stock_data(None, r)  # type: ignore[arg-type]
     assert result is None
 
     await r.delete(cache_key)
@@ -280,7 +280,7 @@ async def test_get_stock_data() -> None:
     await r.set(cache_key, "not-json")
 
     with pytest.raises(instrument_cache.CacheUpdateError) as e:
-        await instrument_cache.get_stock_data("INVALID_JSON")
+        await instrument_cache.get_stock_data("INVALID_JSON", r)
 
     assert (
         str(e.value)
@@ -288,5 +288,5 @@ async def test_get_stock_data() -> None:
     )
 
     # Test get_stock_data with empty string as stock name.
-    result = await instrument_cache.get_stock_data("")
+    result = await instrument_cache.get_stock_data("", r)
     assert result is None

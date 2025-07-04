@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -59,6 +60,7 @@ class RedisSyncConnection(RedisConnection):
     """
 
     connection_pool: Optional[redis.ConnectionPool] = None
+    _lock = threading.Lock()
 
     def get_connection(self) -> redis.Redis:
         """
@@ -81,15 +83,19 @@ class RedisSyncConnection(RedisConnection):
             If the Redis server returns an error
         """
         if self.connection_pool is None:
-            self.connection_pool = redis.ConnectionPool(
-                host=self.host,
-                port=self.port,
-                db=self.db,
-                decode_responses=self.decode_responses,
-                socket_timeout=self.socket_timeout,
-                socket_connect_timeout=self.socket_connect_timeout,
-                retry_on_timeout=self.retry_on_timeout,
-            )
+            # double-checked locking to avoid racing
+            with self._lock:
+                if self.connection_pool is None:
+                    self.connection_pool = redis.ConnectionPool(
+                        host=self.host,
+                        port=self.port,
+                        db=self.db,
+                        decode_responses=self.decode_responses,
+                        socket_timeout=self.socket_timeout,
+                        socket_connect_timeout=self.socket_connect_timeout,
+                        retry_on_timeout=self.retry_on_timeout,
+                    )
+
         connection = redis.Redis(connection_pool=self.connection_pool)
         connection.ping()  # test connection
         return connection
@@ -111,6 +117,7 @@ class RedisAsyncConnection(RedisConnection):
     """
 
     connection_pool: Optional[async_redis.ConnectionPool] = None
+    _lock = threading.Lock()
 
     async def get_connection(self) -> async_redis.Redis:
         """
@@ -134,17 +141,21 @@ class RedisAsyncConnection(RedisConnection):
         """
 
         if self.connection_pool is None:
-            self.connection_pool = async_redis.ConnectionPool(
-                host=self.host,
-                port=self.port,
-                db=self.db,
-                decode_responses=self.decode_responses,
-                socket_timeout=self.socket_timeout,
-                socket_connect_timeout=self.socket_connect_timeout,
-                retry_on_timeout=self.retry_on_timeout,
-            )
+            # double-checked locking to avoid racing
+            with self._lock:
+                if self.connection_pool is None:
+                    logger.debug("Creating new Redis connection pool.")
+                    self.connection_pool = async_redis.ConnectionPool(
+                        host=self.host,
+                        port=self.port,
+                        db=self.db,
+                        decode_responses=self.decode_responses,
+                        socket_timeout=self.socket_timeout,
+                        socket_connect_timeout=self.socket_connect_timeout,
+                        retry_on_timeout=self.retry_on_timeout,
+                    )
         connection = async_redis.Redis(connection_pool=self.connection_pool)
-        # await connection.ping()
+        await connection.ping()
         return connection
 
     async def close_connection(self) -> None:

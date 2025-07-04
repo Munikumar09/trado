@@ -166,8 +166,6 @@ def test_setup_exception_handling():
     assert loop.get_exception_handler() is not None
     assert callable(loop.get_exception_handler())
 
-    loop.close()
-
 
 def test_exception_handler_with_real_exception(mock_logger):
     """
@@ -192,8 +190,6 @@ def test_exception_handler_with_real_exception(mock_logger):
     call_args = mock_logger.error.call_args
     assert "Unhandled exception in async operation" in call_args[0][0]
 
-    loop.close()
-
 
 def test_exception_handler_with_cancelled_error(mock_logger):
     """
@@ -216,8 +212,6 @@ def test_exception_handler_with_cancelled_error(mock_logger):
     # Should not log cancelled errors
     mock_logger.error.assert_not_called()
     mock_logger.warning.assert_not_called()
-
-    loop.close()
 
 
 def test_exception_handler_context_logging(mock_logger):
@@ -243,8 +237,6 @@ def test_exception_handler_context_logging(mock_logger):
     assert len(call_args) >= 2
     extra = call_args[1].get("extra", {})
     assert "task" in extra
-
-    loop.close()
 
 
 # =============================================================================
@@ -308,8 +300,6 @@ def test_install_twisted_reactor_success(mock_logger):
         mock_logger.info.assert_any_call("Installing Twisted AsyncioSelectorReactor...")
         mock_logger.info.assert_any_call("Twisted reactor installed successfully.")
 
-        loop.close()
-
 
 def test_install_twisted_reactor_import_error(mock_logger):
     """
@@ -325,8 +315,6 @@ def test_install_twisted_reactor_import_error(mock_logger):
     mock_logger.warning.assert_called_once_with(
         "Twisted or asyncioreactor not available. Skipping install."
     )
-
-    loop.close()
 
 
 def test_install_twisted_reactor_already_installed_error(mock_logger):
@@ -350,8 +338,6 @@ def test_install_twisted_reactor_already_installed_error(mock_logger):
         warning_call = mock_logger.warning.call_args[0]
         assert "reactor already installed" in warning_call[0].lower()
 
-        loop.close()
-
 
 def test_install_twisted_reactor_unexpected_error(mock_logger):
     """
@@ -371,8 +357,6 @@ def test_install_twisted_reactor_unexpected_error(mock_logger):
 
         mock_logger.error.assert_called_once()
 
-        loop.close()
-
 
 # =============================================================================
 # SIGNAL HANDLING AND FULL INSTALLATION TESTS
@@ -384,6 +368,8 @@ def test_install_twisted_reactor_full_success(mock_logger):
     Test complete install_twisted_reactor function execution. Verifies the full installation
     process including signal handlers and atexit registration.
     """
+    loop = AsyncioLoop.get_loop()
+    loop.close()  # Ensure loop is closed before installation
 
     with patch("app.utils.asyncio_utils.asyncio_support.sys.platform", "linux"):
         new_sys_modules = {
@@ -525,8 +511,6 @@ def test_register_task_for_cleanup():
     assert task not in _running_tasks
     assert len(_running_tasks) == 0
 
-    loop.close()
-
 
 def test_register_task_for_cleanup_auto_removal():
     """
@@ -548,8 +532,6 @@ def test_register_task_for_cleanup_auto_removal():
 
     assert task not in _running_tasks
     assert len(_running_tasks) == 0
-
-    loop.close()
 
 
 # =============================================================================
@@ -841,8 +823,6 @@ def test_exception_handler_edge_cases(mock_logger):
     # Test with None values
     handler(loop, {"exception": None, "message": None, "task": None, "handle": None})
 
-    loop.close()
-
 
 @pytest.mark.asyncio
 async def test_shutdown_empty_state(mock_logger):
@@ -891,8 +871,6 @@ def test_register_task_for_cleanup_edge_cases():
         loop.run_until_complete(task2)
     except asyncio.CancelledError:
         pass  # Expected for cancelled tasks
-
-    loop.close()
 
 
 def test_multiple_asyncio_loop_instances_isolation():

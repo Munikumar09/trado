@@ -1,5 +1,4 @@
 # --- Standard Library Imports ---
-import asyncio
 import os
 from pathlib import Path
 
@@ -10,13 +9,14 @@ from fastapi.responses import JSONResponse
 from twisted.internet import reactor
 
 from app.core.app_state import AppState
-from app.core.application import LOOP, TWISTED_AVAILABLE, app
+from app.core.application import TWISTED_AVAILABLE, app
 
 # --- Project Imports ---
 from app.routers.authentication import authentication
 from app.routers.nse.derivatives import derivatives
 from app.routers.nse.equity import equity
 from app.routers.smartapi.smartapi import smartapi
+from app.utils.asyncio_utils.asyncio_support import AsyncioLoop
 from app.utils.common.logger import get_logger
 from app.utils.constants import API_VERSION, SERVICE_NAME
 
@@ -27,6 +27,8 @@ app.include_router(derivatives.router)
 app.include_router(equity.router)
 app.include_router(smartapi.router)
 app.include_router(authentication.router)
+
+LOOP = AsyncioLoop.get_loop()
 
 
 # --- API Endpoints ---
@@ -73,9 +75,9 @@ async def health_check():
     redis_latency_ms = None
     try:
         if AppState.redis_client:
-            start_time = asyncio.get_event_loop().time()
+            start_time = AsyncioLoop.get_loop().time()
             await AppState.redis_client.ping()
-            end_time = asyncio.get_event_loop().time()
+            end_time = AsyncioLoop.get_loop().time()
             redis_latency_ms = round((end_time - start_time) * 1000, 2)
             redis_status = "ok"
     except RuntimeError:
@@ -94,7 +96,7 @@ async def health_check():
     # Build response with detailed component status
     health_data = {
         "status": "healthy" if status_code == 200 else "unhealthy",
-        "timestamp": asyncio.get_event_loop().time(),
+        "timestamp": AsyncioLoop.get_loop().time(),
         "components": {
             "kafka_consumer": {
                 "status": kafka_status,
@@ -127,7 +129,7 @@ async def start_uvicorn_server():
     port = int(os.getenv("API_PORT", "8000"))
 
     config = uvicorn.Config(
-        app="main:app",
+        app=app,
         host=host,
         port=port,
         log_level=os.getenv("LOG_LEVEL", "info").lower(),
@@ -154,9 +156,8 @@ if __name__ == "__main__":
         if TWISTED_AVAILABLE and reactor is not None:
             # Some reactors may not have 'running' or 'stop' attributes, so check first
             STOP_FN = getattr(reactor, "stop", None)
-            if hasattr(reactor, "running") and getattr(reactor, "running", False):
-                if STOP_FN is not None:
-                    STOP_FN()
+            if callable(STOP_FN) and getattr(reactor, "running", False):
+                STOP_FN()
 
         if not LOOP.is_closed():
             LOOP.close()

@@ -4,12 +4,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import redis.asyncio as redis
+from redis.asyncio import Redis as RedisAsync
 from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import WatchError
 
 from app.utils.common.logger import get_logger
 from app.utils.constants import CHANNEL_PREFIX
-from app.utils.redis_utils import RedisAsyncConnection
 
 logger = get_logger(Path(__file__).name)
 
@@ -63,9 +63,8 @@ def parse_timestamp(timestamp_str: str) -> datetime | None:
     try:
         ts_float = float(timestamp_str)
 
-        # Heuristic: If the number is very large, assume milliseconds.
-        # Timestamps around 2001 and later in ms
-        if ts_float > 1e11:
+        # Seconds since epoch will always be ≤ current time; milliseconds >> current secs
+        if ts_float > datetime.now(tz=timezone.utc).timestamp() * 100:
             dt = datetime.fromtimestamp(ts_float / 1000, tz=timezone.utc)
         else:
             dt = datetime.fromtimestamp(ts_float, tz=timezone.utc)
@@ -148,7 +147,7 @@ def _extract_current_timestamp(current_data_str, cache_key):
 
 
 async def update_stock_cache(
-    cache_key: str, cache_data: dict, redis_client=None
+    cache_key: str, cache_data: dict, redis_client: RedisAsync
 ) -> bool:
     """
     Updates the stock data cache using atomic check-and-set operation.
@@ -165,9 +164,9 @@ async def update_stock_cache(
     cache_data: ``dict``
         The stock data to cache, which must include 'last_traded_timestamp' field.
         Other fields are preserved as-is in the cache.
-    redis_client: ``redis.asyncio.Redis | None``
-        Optional Redis client to use for the operation. If not provided,
-        a new connection will be created from the global connection pool.
+    redis_client: ``RedisAsync``
+        Redis client to use for the operation. A new connection will be created from the
+        global connection pool if not provided.
 
     Returns
     -------
@@ -188,7 +187,10 @@ async def update_stock_cache(
 
     try:
         if redis_client is None:
-            redis_client = await RedisAsyncConnection().get_connection()
+            raise CacheUpdateError(
+                "No Redis client provided for cache update. "
+                "Please provide a valid redis_client parameter."
+            )
     except Exception as e:
         error_msg = f"Failed to get Redis connection for update: {e}"
         logger.error(error_msg)
@@ -244,7 +246,7 @@ async def update_stock_cache(
             )
             return False
 
-    except redis.WatchError:
+    except WatchError:
         logger.warning(
             "WatchError for %s. Another client modified the key. Update skipped for this message.",
             cache_key,
@@ -260,7 +262,9 @@ async def update_stock_cache(
         raise CacheUpdateError(error_msg) from e
 
 
-async def get_stock_data(stock_name: str) -> dict[str, Any] | None:
+async def get_stock_data(
+    stock_name: str, redis_connection: RedisAsync
+) -> dict[str, Any] | None:
     """
     Retrieves the latest stock data from the Redis cache.
 
@@ -291,10 +295,8 @@ async def get_stock_data(stock_name: str) -> dict[str, Any] | None:
         return None
 
     try:
-        connection = RedisAsyncConnection()
-        r = await connection.get_connection()
         cache_key = f"{CHANNEL_PREFIX}{stock_name}"
-        data_str = await r.get(cache_key)
+        data_str = await redis_connection.get(cache_key)
 
         if data_str:
             return json.loads(data_str)
@@ -302,10 +304,6 @@ async def get_stock_data(stock_name: str) -> dict[str, Any] | None:
         return None
     except RuntimeError as e:
         error_msg = f"RuntimeError retrieving cache for {stock_name}: {e}"
-        logger.error(error_msg)
-        raise CacheUpdateError(error_msg) from e
-    except RedisConnectionError as e:
-        error_msg = f"Redis connection error during retrieval for {stock_name}: {e}"
         logger.error(error_msg)
         raise CacheUpdateError(error_msg) from e
     except json.JSONDecodeError as e:

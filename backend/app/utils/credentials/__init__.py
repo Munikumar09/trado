@@ -1,1 +1,1 @@
-from .smartapi_credentails import *
+from .smartapi_credentials import *

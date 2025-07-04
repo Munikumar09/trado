@@ -334,8 +334,8 @@ def test_call_method_large_queue_flushing(basic_kafka_producer, mock_logger):
     prevent memory issues.
     """
     # Mock poll to return large number of messages
-    basic_kafka_producer.kafka_producer.poll.return_value = 15000
     basic_kafka_producer.kafka_producer.flush.return_value = 5000
+    basic_kafka_producer.kafka_producer.__len__.return_value = 15000
 
     result = basic_kafka_producer(TEST_DATA)
 
@@ -612,7 +612,7 @@ def test_queue_management_edge_cases(basic_kafka_producer):
     basic_kafka_producer.kafka_producer.reset_mock()
 
     # Test just over threshold (should trigger flush)
-    basic_kafka_producer.kafka_producer.poll.return_value = 10001
+    basic_kafka_producer.kafka_producer.__len__.return_value = 10001
     basic_kafka_producer.kafka_producer.flush.return_value = 8000
 
     result = basic_kafka_producer("test message")
@@ -1104,7 +1104,7 @@ def test_queue_management_with_exact_threshold_values(
 
     for queue_size, should_flush in test_cases:
         basic_kafka_producer.kafka_producer.reset_mock()
-        basic_kafka_producer.kafka_producer.poll.return_value = queue_size
+        basic_kafka_producer.kafka_producer.__len__.return_value = queue_size
         basic_kafka_producer.kafka_producer.flush.return_value = queue_size // 2
 
         result = basic_kafka_producer("test message")

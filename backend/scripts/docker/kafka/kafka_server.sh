@@ -19,7 +19,7 @@ PARTITIONS="${KAFKA_PARTITIONS:-5}"                   # Default to 5 if not set 
 REPLICATION_FACTOR="${KAFKA_REPLICATION_FACTOR:-1}"   # Default to 1 if not set in .env
 KAFKA_PORT="${KAFKA_PORT:-9092}"                      # Default to 9092 if not set in .env
 RETENTION_TIME_MINUTES="${RETENTION_TIME_MINUTES:-5}" # Default to 5 minutes if not set in .env
-RETENTION_TIME_MS=$(($KAFKA_RETENTION_TIME_MINUTES * 60 * 1000))
+RETENTION_TIME_MS=$(($RETENTION_TIME_MINUTES * 60 * 1000))
 KAFKA_COMPOSE_PATH="../../../app/configs/docker/kafka/bitnami_kafka.yaml"
 
 # Function to check if a Docker container is running

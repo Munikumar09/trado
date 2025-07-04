@@ -1,6 +1,6 @@
+import asyncio
 import json
 import logging
-from typing import cast
 
 from autobahn.twisted.websocket import WebSocketServerFactory, WebSocketServerProtocol
 
@@ -14,11 +14,11 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
     """
     This class handles WebSocket connections for the stock ticker server. It manages the
     connection with the client, processes incoming messages, and sends messages back to the client.
-    It is responsible for subscribing and unsubscribing to stock tokens based on the messages
+    It is responsible for subscribing and unsubscribing to stocks based on the messages
     received from the client.
     """
 
-    connection_manager: ConnectionManager | None = None
+    connection_manager: ConnectionManager
 
     def onOpen(self):
         """
@@ -27,11 +27,41 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
         logger.info("WebSocket connection open: %s", self.peer)
         fire_and_forgot(self.connection_manager.connect(self))
 
+    async def _handle_stock_operations(
+        self, operation_type: str, stock_tokens: list[str]
+    ):
+        """
+        Handle subscribe or unsubscribe operations for multiple stock tokens.
+
+        Parameters
+        ----------
+        operation_type : str
+            Either "subscribe" or "unsubscribe"
+        stock_tokens : list[str]
+            List of stock tokens to process
+        """
+        if operation_type == "subscribe":
+            await asyncio.gather(
+                *(
+                    self.connection_manager.handle_subscribe(self, token)
+                    for token in stock_tokens
+                ),
+                return_exceptions=True,
+            )
+        elif operation_type == "unsubscribe":
+            await asyncio.gather(
+                *(
+                    self.connection_manager.handle_unsubscribe(self, token)
+                    for token in stock_tokens
+                ),
+                return_exceptions=True,
+            )
+
     def handle_message(self, message: str | bytes):
         """
         Handle incoming messages from the client. This method is called when a message is received
         from the client. It decodes the message, parses it as JSON, and processes the action. The
-        action can be either "subscribe" or "unsubscribe" for stock tokens.
+        action can be either "subscribe" or "unsubscribe" for stocks.
 
         Parameters
         ----------
@@ -55,12 +85,10 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
             return
 
         if action == "subscribe" and stock_tokens:
-            for token in stock_tokens:
-                fire_and_forgot(self.connection_manager.handle_subscribe(self, token))
+            fire_and_forgot(self._handle_stock_operations("subscribe", stock_tokens))
 
         elif action == "unsubscribe" and stock_tokens:
-            for token in stock_tokens:
-                fire_and_forgot(self.connection_manager.handle_unsubscribe(self, token))
+            fire_and_forgot(self._handle_stock_operations("unsubscribe", stock_tokens))
         else:
             logger.warning("Invalid message format from %s: %s", self.peer, message)
             err_msg = {
@@ -91,11 +119,15 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
             self.handle_message(payload)
 
         except json.JSONDecodeError:
-            logger.error(
-                "Failed to decode JSON message from %s: %s",
-                self.peer,
-                cast(bytes, payload).decode("utf-8", errors="ignore"),
+            bad_msg = (
+                payload.decode("utf-8", errors="ignore")
+                if isinstance(payload, (bytes, bytearray))
+                else payload
             )
+            logger.error(
+                "Failed to decode JSON message from %s: %s", self.peer, bad_msg
+            )
+
             if self.connection_manager:
                 err_msg = {"type": "error", "message": "Invalid JSON format"}
                 fire_and_forgot(

@@ -74,7 +74,6 @@ class Consumer(ABC, Registrable, metaclass=ConsumerMeta):
         ``NotImplementedError``
             If the method is not implemented by a subclass
         """
-        raise NotImplementedError
 
     @classmethod
     @abstractmethod
@@ -102,4 +101,3 @@ class Consumer(ABC, Registrable, metaclass=ConsumerMeta):
         ``NotImplementedError``
             If the method is not implemented by a subclass
         """
-        raise NotImplementedError

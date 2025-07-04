@@ -5,7 +5,8 @@ import signal
 import sys
 from asyncio import AbstractEventLoop, CancelledError, Task
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Set
+from typing import Any, Callable, List, Optional
+from weakref import WeakSet
 
 from app.core.singleton import Singleton
 from app.utils.asyncio_utils.coro_utils import fire_and_forgot
@@ -18,7 +19,7 @@ logger = get_logger(Path(__file__).name)
 _shutdown_tasks: List[Callable[[], Any]] = []
 
 # Tasks to be cancelled during cleanup
-_running_tasks: Set[Task] = set()
+_running_tasks: WeakSet[Task] = WeakSet()
 
 
 class AsyncioLoop(metaclass=Singleton):
@@ -41,8 +42,12 @@ class AsyncioLoop(metaclass=Singleton):
             The singleton event loop instance
         """
         if cls._loop is None or cls._loop.is_closed():
-            cls._loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(cls._loop)
+            try:
+                cls._loop = asyncio.get_running_loop()
+            except RuntimeError:
+                cls._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(cls._loop)
+
             _setup_exception_handling(cls._loop)
             logger.info("Created new asyncio event loop (singleton).")
 
