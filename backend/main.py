@@ -157,7 +157,7 @@ if __name__ == "__main__":
             # Some reactors may not have 'running' or 'stop' attributes, so check first
             STOP_FN = getattr(reactor, "stop", None)
             if callable(STOP_FN) and getattr(reactor, "running", False):
-                STOP_FN()
+                STOP_FN()  # pylint: disable=not-callable
 
         if not LOOP.is_closed():
             LOOP.close()
