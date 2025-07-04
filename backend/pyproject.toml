@@ -44,6 +44,8 @@ pytest-asyncio = "^0.25.3"
 fastapi-limiter = "^0.1.6"
 fakeredis = {extras = ["lua"], version = "^2.26.2"}
 playwright = "^1.50.0"
+confluent-kafka = "^2.11.0"
+service-identity = "^24.2.0"
 
 
 

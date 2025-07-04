@@ -700,7 +700,7 @@ async def test_handle_subscribe_success(
         f"{CHANNEL_PREFIX}AAPL", conn_manager.redis_callback
     )
 
-    mock_get_stock_data.assert_called_once_with("AAPL")
+    mock_get_stock_data.assert_called_once_with("AAPL", mock_pubsub_manager.redis)
 
     # Verify messages sent to client
     assert mock_send.call_count == 2
@@ -747,6 +747,10 @@ async def test_handle_subscribe_existing_subscription(
 
     # Add existing subscription
     conn_manager.subscriptions["AAPL"] = {"existing_client"}
+
+    conn_manager.pubsub_manager.redis.get.return_value = json.dumps(
+        {"symbol": "AAPL", "last_traded_timestamp": "2023-01-01T00:00:00Z"}
+    )
 
     with patch.object(conn_manager, "send_personal_message", new_callable=AsyncMock):
         await conn_manager.handle_subscribe(mock_websocket_client, "AAPL")
@@ -1052,6 +1056,8 @@ async def test_end_to_end_subscription_flow(
     mock_redis.pubsub.return_value = mock_redis.pubsub
     mock_redis.pubsub.listen = partial(mock_listen, messages)
 
+    conn_manager.pubsub_manager.redis.get.return_value = json.dumps(messages[1]["data"])
+
     with patch.object(
         conn_manager, "send_personal_message", new_callable=AsyncMock
     ) as mock_send:
@@ -1173,7 +1179,7 @@ async def test_client_disconnect_during_operation(mock_redis, mock_get_stock_dat
     assert len(pubsub_manager.tasks) == 0
     assert len(pubsub_manager.channel_activity) == 0
 
-    mock_get_stock_data.assert_called_with("AAPL")
+    mock_get_stock_data.assert_called_with("AAPL", pubsub_manager.redis)
     assert mock_get_stock_data.call_count == 2  # Called for both clients
 
     # Clean up
