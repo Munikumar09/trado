@@ -1,6 +1,7 @@
 # pylint: disable= protected-access
 import json
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -10,6 +11,19 @@ from app.utils.redis_utils import RedisAsyncConnection
 
 # Helper for valid timestamp
 VALID_TIMESTAMP = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+@pytest.fixture(autouse=True)
+def mock_redis(mocker):
+    """
+    Fixture to mock RedisAsyncConnection.get_connection method.
+    """
+    mock_redis = AsyncMock()
+    mocker.patch(
+        "app.utils.redis_utils.RedisAsyncConnection.get_connection",
+        return_value=mock_redis,
+    )
+    return mock_redis
 
 
 @pytest.mark.parametrize(
@@ -166,43 +180,65 @@ def test_extract_current_timestamp() -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_stock_cache_valid() -> None:
+async def test_update_stock_cache_valid(mocker):
     """
     Test update_stock_cache for valid update, skip, and newer timestamp scenarios.
     """
-    redis_connection = RedisAsyncConnection()
-    r = await redis_connection.get_connection()
 
     cache_key = "test_update_stock_cache_valid"
-    await r.delete(cache_key)
+
+    # STEP 1: Prepare mock pipeline object
+    mock_pipe = MagicMock()
+    mock_pipe.watch = AsyncMock()
+    mock_pipe.multi = MagicMock()
+    mock_pipe.set = MagicMock()
+    mock_pipe.execute = AsyncMock()
+
+    # STEP 2: Create async context manager mock for redis_client.pipeline()
+    mock_pipeline_cm = AsyncMock()
+    mock_pipeline_cm.__aenter__.return_value = mock_pipe
+    mock_pipeline_cm.__aexit__.return_value = None
+
+    # STEP 3: Create redis_client mock and patch pipeline()
+    mock_redis = mocker.Mock()
+    mock_redis.pipeline.return_value = mock_pipeline_cm
+
+    # CASE 1: No existing data → should update
+    mock_pipe.get = AsyncMock(return_value=None)  # No data in cache
+    mock_pipe.execute.return_value = [True]  # Successful transaction
+
     cache_data = {"last_traded_timestamp": VALID_TIMESTAMP, "foo": 1}
-
-    # Should update (no data in cache)
     result = await instrument_cache.update_stock_cache(
-        cache_key, cache_data, redis_client=r
+        cache_key, cache_data, redis_client=mock_redis
     )
-    assert result
+    assert result is True
 
-    # Should skip if not newer (same timestamp)
+    # CASE 2: Same timestamp → should skip
+    cached_data = {
+        "last_traded_timestamp": VALID_TIMESTAMP,
+        "foo": 1,
+    }
+    mock_pipe.get = AsyncMock(return_value=json.dumps(cached_data))
+
     result = await instrument_cache.update_stock_cache(
-        cache_key, cache_data, redis_client=r
+        cache_key, cache_data, redis_client=mock_redis
     )
-    assert not result
+    assert result is False
 
-    # Should update if newer timestamp
+    # CASE 3: Newer timestamp → should update
+    newer_timestamp = (datetime.now(timezone.utc) + timedelta(seconds=10)).isoformat()
+    cached_data["last_traded_timestamp"] = VALID_TIMESTAMP  # older one in cache
+    mock_pipe.get = AsyncMock(return_value=json.dumps(cached_data))
+    mock_pipe.execute.return_value = [True]  # Success again
+
     new_data = {
-        "last_traded_timestamp": (
-            datetime.now(timezone.utc) + timedelta(seconds=10)
-        ).isoformat(),
+        "last_traded_timestamp": newer_timestamp,
         "foo": 2,
     }
     result = await instrument_cache.update_stock_cache(
-        cache_key, new_data, redis_client=r
+        cache_key, new_data, redis_client=mock_redis
     )
-    assert result
-
-    await r.delete(cache_key)
-    await redis_connection.close_connection()
+    assert result is True
 
 
 @pytest.mark.asyncio
@@ -247,7 +283,7 @@ async def test_update_stock_cache_missing_timestamp() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_stock_data() -> None:
+async def test_get_stock_data(mock_redis) -> None:
     """
     Test get_stock_data for not found, valid, invalid stock name, and invalid JSON.
     """
@@ -255,6 +291,7 @@ async def test_get_stock_data() -> None:
     r = await redis_connection.get_connection()
     stock_name = "INFY"
     cache_key = f"{CHANNEL_PREFIX}{stock_name}"
+    mock_redis.get = AsyncMock(return_value=None)
     await r.delete(cache_key)
 
     # Not found
@@ -264,6 +301,8 @@ async def test_get_stock_data() -> None:
     # Insert and get
     data = {"foo": 1, "last_traded_timestamp": VALID_TIMESTAMP}
     await r.set(cache_key, json.dumps(data))
+
+    mock_redis.get = AsyncMock(return_value=json.dumps(data))
     result = await instrument_cache.get_stock_data(stock_name, r)
     assert result is not None
     assert result["foo"] == 1
@@ -278,6 +317,8 @@ async def test_get_stock_data() -> None:
     # Invalid json data
     cache_key = f"{CHANNEL_PREFIX}INVALID_JSON"
     await r.set(cache_key, "not-json")
+
+    mock_redis.get = AsyncMock(return_value="not-json")
 
     with pytest.raises(instrument_cache.CacheUpdateError) as e:
         await instrument_cache.get_stock_data("INVALID_JSON", r)
