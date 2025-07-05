@@ -37,6 +37,8 @@ env:
   REDIS_HOST: ${{ secrets.REDIS_HOST }}
   REDIS_PORT: ${{ secrets.REDIS_PORT }}
   REDIS_DB: ${{ secrets.REDIS_DB }}
+
+  KAFKA_TOPIC_INSTRUMENT: ${{ secrets.KAFKA_TOPIC_INSTRUMENT }}
   
 on:
   pull_request:
