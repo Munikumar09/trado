@@ -39,6 +39,8 @@ env:
   REDIS_DB: ${{ secrets.REDIS_DB }}
 
   KAFKA_TOPIC_INSTRUMENT: ${{ secrets.KAFKA_TOPIC_INSTRUMENT }}
+  KAFKA_BROKER_URL: ${{ secrets.KAFKA_BROKER_URL }}
+  KAFKA_CONSUMER_GROUP_ID: ${{ secrets.KAFKA_CONSUMER_GROUP_ID }}
   
 on:
   pull_request:
