@@ -77,7 +77,7 @@ def mock_redis(mock_pubsub):
     """
     redis_mock = AsyncMock()
     redis_mock.pubsub = mock_pubsub
-    redis_mock.ping = MagicMock(return_value=True)
+    redis_mock.ping = AsyncMock(return_value=True)
 
     return redis_mock
 
