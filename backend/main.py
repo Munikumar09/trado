@@ -6,7 +6,6 @@ import uvicorn
 
 # --- Third-Party Imports ---
 from fastapi.responses import JSONResponse
-from twisted.internet import reactor
 
 from app.core.app_state import AppState
 from app.core.application import TWISTED_AVAILABLE, app
@@ -19,6 +18,8 @@ from app.routers.smartapi.smartapi import smartapi
 from app.utils.asyncio_utils.asyncio_support import AsyncioLoop
 from app.utils.common.logger import get_logger
 from app.utils.constants import API_VERSION, SERVICE_NAME
+
+from twisted.internet import reactor  # isort: skip
 
 logger = get_logger(Path(__file__).name)
 

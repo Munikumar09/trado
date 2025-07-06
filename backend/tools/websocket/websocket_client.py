@@ -54,7 +54,9 @@ async def connect_and_subscribe(uri, stocks):
                         # Optional: Add specific handling based on message type
                         if message.get("type") == "stock_update":
                             # Process stock update data
-                            pass
+                            logger.info(
+                                "stock_update received: %s", message.get("data")
+                            )
                         elif message.get("type") == "error":
                             logger.error(
                                 "Received error from server: %s", message.get("message")

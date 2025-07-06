@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from typing import cast
 
 from autobahn.twisted.websocket import WebSocketServerFactory, WebSocketServerProtocol
 
@@ -18,7 +19,7 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
     received from the client.
     """
 
-    connection_manager: ConnectionManager
+    connection_manager: ConnectionManager | None = None
 
     def onOpen(self):
         """
@@ -43,7 +44,9 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
         if operation_type == "subscribe":
             await asyncio.gather(
                 *(
-                    self.connection_manager.handle_subscribe(self, token)
+                    cast(ConnectionManager, self.connection_manager).handle_subscribe(
+                        self, token
+                    )
                     for token in stock_tokens
                 ),
                 return_exceptions=True,
@@ -51,7 +54,9 @@ class StockTickerServerProtocol(WebSocketServerProtocol):
         elif operation_type == "unsubscribe":
             await asyncio.gather(
                 *(
-                    self.connection_manager.handle_unsubscribe(self, token)
+                    cast(ConnectionManager, self.connection_manager).handle_unsubscribe(
+                        self, token
+                    )
                     for token in stock_tokens
                 ),
                 return_exceptions=True,

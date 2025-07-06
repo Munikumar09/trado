@@ -81,7 +81,7 @@ class RedisPubSubManager(metaclass=Singleton):
             return False
 
         try:
-            self.redis.ping()
+            await self.redis.ping()
             self.subscribed_channels[channel] = callback
             self.channel_activity[channel] = time.time()  # Track subscription time
 
