@@ -19,7 +19,8 @@ from app.utils.asyncio_utils.asyncio_support import AsyncioLoop
 from app.utils.common.logger import get_logger
 from app.utils.constants import API_VERSION, SERVICE_NAME
 
-from twisted.internet import reactor  # isort: skip
+# Import reactor after the twisted installation in the application module
+from twisted.internet import reactor  # isort: skip # pylint: disable=wrong-import-order
 
 logger = get_logger(Path(__file__).name)
 
