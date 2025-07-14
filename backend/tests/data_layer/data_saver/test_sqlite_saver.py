@@ -783,14 +783,20 @@ def test_from_cfg_success(
 def test_from_cfg_kafka_consumer_creation_fails(
     mock_get_kafka_consumer: MockType,
     basic_config: DictConfig,
+    mock_logger: MockType,
 ) -> None:
     """
     Test from_cfg when Kafka consumer creation fails.
     """
     # Mock consumer creation failure
-    mock_get_kafka_consumer.return_value = None
+    mock_get_kafka_consumer.side_effect = KafkaException(
+        "Kafka consumer creation failed"
+    )
 
     saver = SqliteDataSaver.from_cfg(basic_config)
+    mock_logger.error.assert_called_once_with(
+        "Error while creating SqliteDataSaver: %s", mock_get_kafka_consumer.side_effect
+    )
 
     assert saver is None
 

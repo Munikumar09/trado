@@ -80,25 +80,26 @@ class JSONLDataSaver(DataSaver):
         """
         Create an instance of the JSONLDataSaver class from the given configuration.
         """
-        consumer = get_kafka_consumer(
-            {
-                "bootstrap.servers": cfg.streaming.kafka_server,
-                "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
-                **KAFKA_CONSUMER_DEFAULT_CONFIG,
-            },
-            cfg.streaming.kafka_topic,
-        )
-
-        if not consumer:
-            return None
-
-        if not cfg.get("jsonl_file_path"):
-            logger.error(
-                "No jsonl_file_path provided in the configuration. No data will be saved."
+        try:
+            consumer = get_kafka_consumer(
+                {
+                    "bootstrap.servers": cfg.streaming.kafka_server,
+                    "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
+                    **KAFKA_CONSUMER_DEFAULT_CONFIG,
+                },
+                cfg.streaming.kafka_topic,
             )
-            return None
 
-        return cls(
-            consumer,
-            cfg.get("jsonl_file_path"),
-        )
+            if not cfg.get("jsonl_file_path"):
+                logger.error(
+                    "No jsonl_file_path provided in the configuration. No data will be saved."
+                )
+                return None
+
+            return cls(
+                consumer,
+                cfg.get("jsonl_file_path"),
+            )
+        except KafkaException as e:
+            logger.error("Error while creating JSONLDataSaver: %s", e)
+            return None

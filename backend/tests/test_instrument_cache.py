@@ -289,45 +289,54 @@ async def test_get_stock_data(mock_redis) -> None:
     """
     redis_connection = RedisAsyncConnection()
     r = await redis_connection.get_connection()
-    stock_name = "INFY"
-    cache_key = f"{CHANNEL_PREFIX}{stock_name}"
-    mock_redis.get = AsyncMock(return_value=None)
-    await r.delete(cache_key)
 
-    # Not found
-    result = await instrument_cache.get_stock_data(stock_name, r)
-    assert result is None
+    try:
+        stock_name = "INFY"
+        cache_key = f"{CHANNEL_PREFIX}{stock_name}"
+        await r.delete(cache_key)
 
-    # Insert and get
-    data = {"foo": 1, "last_traded_timestamp": VALID_TIMESTAMP}
-    await r.set(cache_key, json.dumps(data))
+        # Test 1: Not found - use mock_redis for consistency
+        mock_redis.get = AsyncMock(return_value=None)
+        result = await instrument_cache.get_stock_data(stock_name, mock_redis)
+        assert result is None
 
-    mock_redis.get = AsyncMock(return_value=json.dumps(data))
-    result = await instrument_cache.get_stock_data(stock_name, r)
-    assert result is not None
-    assert result["foo"] == 1
+        # Test 2: Insert and get - use real redis for data setup, mock for retrieval
+        data = {"foo": 1, "last_traded_timestamp": VALID_TIMESTAMP}
+        await r.set(cache_key, json.dumps(data))
 
-    # Invalid stock name
-    result = await instrument_cache.get_stock_data(None, r)  # type: ignore[arg-type]
-    assert result is None
+        mock_redis.get = AsyncMock(return_value=json.dumps(data))
+        result = await instrument_cache.get_stock_data(stock_name, mock_redis)
+        assert result is not None
+        assert result["foo"] == 1
 
-    await r.delete(cache_key)
-    await redis_connection.close_connection()
+        # Test 3: Invalid stock name - use mock_redis
+        result = await instrument_cache.get_stock_data(None, mock_redis)  # type: ignore[arg-type]
+        assert result is None
 
-    # Invalid json data
-    cache_key = f"{CHANNEL_PREFIX}INVALID_JSON"
-    await r.set(cache_key, "not-json")
+        # Test 4: Empty string as stock name - use mock_redis
+        result = await instrument_cache.get_stock_data("", mock_redis)
+        assert result is None
 
-    mock_redis.get = AsyncMock(return_value="not-json")
+        # Clean up first test data
+        await r.delete(cache_key)
 
-    with pytest.raises(instrument_cache.CacheUpdateError) as e:
-        await instrument_cache.get_stock_data("INVALID_JSON", r)
+        # Test 5: Invalid JSON data - setup with real redis, test with mock
+        invalid_cache_key = f"{CHANNEL_PREFIX}INVALID_JSON"
+        await r.set(invalid_cache_key, "not-json")
 
-    assert (
-        str(e.value)
-        == "Failed to decode cached JSON for INVALID_JSON: Expecting value: line 1 column 1 (char 0)"
-    )
+        mock_redis.get = AsyncMock(return_value="not-json")
 
-    # Test get_stock_data with empty string as stock name.
-    result = await instrument_cache.get_stock_data("", r)
-    assert result is None
+        with pytest.raises(instrument_cache.CacheUpdateError) as e:
+            await instrument_cache.get_stock_data("INVALID_JSON", mock_redis)
+
+        assert (
+            str(e.value)
+            == "Failed to decode cached JSON for INVALID_JSON: Expecting value: line 1 column 1 (char 0)"
+        )
+
+        # Clean up invalid json test data
+        await r.delete(invalid_cache_key)
+
+    finally:
+        # Ensure connection is always closed
+        await redis_connection.close_connection()

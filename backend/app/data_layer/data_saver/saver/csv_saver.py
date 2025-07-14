@@ -52,15 +52,13 @@ class CSVDataSaver(DataSaver):
         """
         Retrieve the data from the kafka consumer and save it to the csv file.
         """
-        idx = 0
-
+        message_count = 0
         try:
             with open(self.csv_file_path, "a", encoding="utf-8", newline="") as file:
                 writer = csv.writer(file)
 
                 # Check if file is empty before writing headers
                 file_is_empty = file.tell() == 0
-
                 while True:
                     data = self.consumer.poll(timeout=1.0)
                     if not data:
@@ -72,20 +70,29 @@ class CSVDataSaver(DataSaver):
                     message = data.value().decode("utf-8")
                     decoded_data = json.loads(message)
 
-                    if idx == 0 and file_is_empty:
+                    if message_count == 0 and file_is_empty:
                         writer.writerow(list(decoded_data.keys()))
                         file_is_empty = False
 
                     writer.writerow(list(decoded_data.values()))
-                    idx += 1
+                    message_count += 1
 
                     # Save the data as soon as it is received
                     file.flush()
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.error("Data format error while saving to csv: %s", e)
+        except KafkaException as e:
+            logger.error("Kafka error while consuming messages: %s", e)
+        except OSError as e:
+            logger.error("File I/O error while saving to csv: %s", e)
         except Exception as e:
-            logger.error("Error while saving data to csv: %s", e)
+            logger.error("Unexpected error while saving data to csv: %s", e)
         finally:
-            self.consumer.close()
-            logger.info("%s messages saved to csv", idx)
+            try:
+                self.consumer.close()
+            except Exception as e:
+                logger.error("Error closing consumer: %s", e)
+            logger.info("%s messages saved to csv", message_count)
 
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["CSVDataSaver"]:
@@ -98,24 +105,25 @@ class CSVDataSaver(DataSaver):
             Configuration object containing the necessary information to
             initialize the CSVDataSaver object
         """
-        consumer = get_kafka_consumer(
-            {
-                "bootstrap.servers": cfg.streaming.kafka_server,
-                "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
-                **KAFKA_CONSUMER_DEFAULT_CONFIG,
-            },
-            cfg.streaming.kafka_topic,
-        )
+        try:
+            consumer = get_kafka_consumer(
+                {
+                    "bootstrap.servers": cfg.streaming.kafka_server,
+                    "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
+                    **KAFKA_CONSUMER_DEFAULT_CONFIG,
+                },
+                cfg.streaming.kafka_topic,
+            )
 
-        if not consumer:
+            csv_file_path = cfg.get("csv_file_path")
+            if not csv_file_path:
+                logger.error("csv_file_path not provided in configuration")
+                return None
+
+            return cls(
+                consumer,
+                csv_file_path,
+            )
+        except KafkaException as e:
+            logger.error("Error while creating CSVDataSaver: %s", e)
             return None
-
-        csv_file_path = cfg.get("csv_file_path")
-        if not csv_file_path:
-            logger.error("csv_file_path not provided in configuration")
-            return None
-
-        return cls(
-            consumer,
-            csv_file_path,
-        )

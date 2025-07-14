@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from confluent_kafka import KafkaException
 from omegaconf import OmegaConf
 
 from app.data_layer.data_saver.saver.csv_saver import CSVDataSaver, DataSaver
@@ -149,13 +150,21 @@ def test_from_cfg_success(valid_config, mock_get_kafka_consumer, mock_consumer):
     mock_get_kafka_consumer.assert_called_once()
 
 
-def test_from_cfg_kafka_consumer_creation_fails(valid_config, mock_get_kafka_consumer):
+def test_from_cfg_kafka_consumer_creation_fails(
+    valid_config, mock_get_kafka_consumer, mock_logger
+):
     """
     Test when Kafka consumer creation fails.
     """
-    mock_get_kafka_consumer.return_value = None
+    mock_get_kafka_consumer.side_effect = KafkaException(
+        "Kafka consumer creation failed"
+    )
 
     saver = CSVDataSaver.from_cfg(valid_config)
+
+    mock_logger.error.assert_called_once_with(
+        "Error while creating CSVDataSaver: %s", mock_get_kafka_consumer.side_effect
+    )
 
     assert saver is None
 
@@ -408,7 +417,7 @@ def test_retrieve_and_save_ensures_consumer_closed_on_exception(
 
     mock_consumer.close.assert_called_once()
     mock_logger.error.assert_called_once_with(
-        "Error while saving data to csv: %s", open_mocker.side_effect
+        "File I/O error while saving to csv: %s", open_mocker.side_effect
     )
 
 

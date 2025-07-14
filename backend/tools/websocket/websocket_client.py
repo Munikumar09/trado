@@ -85,21 +85,10 @@ async def connect_and_subscribe(uri, stocks):
                             "An error occurred while processing a message: %s", e
                         )
                         # Decide if you want to break or continue on other errors
-        except websockets.exceptions.InvalidStatusCode as e:
-            # Log specific HTTP errors like 403
-            logger.error(
-                "Server rejected connection: HTTP %s. Check URI, headers, and server logs.",
-                e.status_code,
-            )
-            if e.status_code == 403:
-                logger.error(
-                    "HTTP 403 Forbidden - Likely requires Origin header (removed for testing TypeError)."
-                )
-            break  # Stop retrying on definitive rejection like 403
         except websockets.exceptions.InvalidURI:
             logger.error("Invalid WebSocket URI: %s", uri)
             break  # Stop if URI is fundamentally wrong
-        except (ConnectionRefusedError, websockets.exceptions.InvalidStatusCode) as e:
+        except ConnectionRefusedError as e:
             retry_count += 1
             if retry_count >= max_retries:
                 logger.error("Max retries exceeded. Giving up.")
@@ -113,9 +102,17 @@ async def connect_and_subscribe(uri, stocks):
                 delay,
             )
             await asyncio.sleep(delay)
-        except Exception as e:
-            logger.error("Unexpected error: %s", e)
-            break
+        except websockets.exceptions.InvalidStatusCode as e:
+            # Log specific HTTP errors like 403
+            logger.error(
+                "Server rejected connection: HTTP %s. Check URI, headers, and server logs.",
+                e.status_code,
+            )
+            if e.status_code == 403:
+                logger.error(
+                    "HTTP 403 Forbidden - Likely requires Origin header (removed for testing TypeError)."
+                )
+            break  # Stop retrying on definitive rejection like 403
 
 
 async def main():

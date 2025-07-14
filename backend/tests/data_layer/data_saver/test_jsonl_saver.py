@@ -9,6 +9,7 @@ from unittest.mock import ANY, MagicMock, mock_open, patch
 
 import pandas as pd
 import pytest
+from confluent_kafka.error import KafkaException
 from omegaconf import DictConfig, OmegaConf
 from pytest_mock import MockerFixture, MockType
 
@@ -222,14 +223,19 @@ def test_from_cfg_success(basic_config, mock_get_kafka_consumer):
     mock_get_kafka_consumer.assert_called_once()
 
 
-def test_from_cfg_no_consumer(basic_config, mock_get_kafka_consumer):
+def test_from_cfg_no_consumer(basic_config, mock_get_kafka_consumer, mock_logger):
     """T
     est from_cfg when consumer creation fails.
     """
-    mock_get_kafka_consumer.return_value = None
+    mock_get_kafka_consumer.side_effect = KafkaException(
+        "Kafka consumer creation failed"
+    )
 
     saver = JSONLDataSaver.from_cfg(basic_config)
     mock_get_kafka_consumer.assert_called_once()
+    mock_logger.error.assert_called_once_with(
+        "Error while creating JSONLDataSaver: %s", mock_get_kafka_consumer.side_effect
+    )
 
     assert saver is None
 
@@ -467,7 +473,6 @@ def test_retrieve_and_save_file_permission_error(
     assert error_calls[0][0][0] == "Error while saving data to jsonl: %s"
     assert isinstance(error_calls[0][0][1], PermissionError)
     assert str(error_calls[0][0][1]) == "Permission denied"
-    mock_consumer.close.assert_called_once()
     mock_consumer.close.assert_called_once()
 
 

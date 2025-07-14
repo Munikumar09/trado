@@ -16,6 +16,11 @@ sleep 10
 python main.py >/tmp/server.log 2>&1 &
 SERVER_PID=$!
 
+# Define cleanup function first
+cleanup() {
+	kill $WS_PID $SERVER_PID 2>/dev/null || true
+}
+trap cleanup SIGINT SIGTERM EXIT
 # Wait for server to start
 echo "Waiting for server to start..."
 MAX_RETRIES=30
@@ -33,12 +38,6 @@ if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
 fi
 
 echo "Server is ready"
-
-# 4) cleanup on exit
-cleanup() {
-	kill $WS_PID $SERVER_PID 2>/dev/null || true
-}
-trap cleanup SIGINT SIGTERM EXIT
 
 # 5) wait for both to exit
 wait $WS_PID $SERVER_PID

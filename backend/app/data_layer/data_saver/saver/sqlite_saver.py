@@ -128,24 +128,25 @@ class SqliteDataSaver(DataSaver):
 
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["SqliteDataSaver"]:
-        consumer = get_kafka_consumer(
-            {
-                "bootstrap.servers": cfg.streaming.kafka_server,
-                "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
-                **KAFKA_CONSUMER_DEFAULT_CONFIG,
-            },
-            cfg.streaming.kafka_topic,
-        )
+        try:
+            consumer = get_kafka_consumer(
+                {
+                    "bootstrap.servers": cfg.streaming.kafka_server,
+                    "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
+                    **KAFKA_CONSUMER_DEFAULT_CONFIG,
+                },
+                cfg.streaming.kafka_topic,
+            )
 
-        if not consumer:
+            sqlite_db_path = cfg.get("sqlite_db")
+            if not sqlite_db_path:
+                logger.error("sqlite_db path not provided in configuration")
+                return None
+
+            return cls(
+                consumer,
+                sqlite_db_path,
+            )
+        except KafkaException as e:
+            logger.error("Error while creating SqliteDataSaver: %s", e)
             return None
-
-        sqlite_db_path = cfg.get("sqlite_db")
-        if not sqlite_db_path:
-            logger.error("sqlite_db path not provided in configuration")
-            return None
-
-        return cls(
-            consumer,
-            sqlite_db_path,
-        )

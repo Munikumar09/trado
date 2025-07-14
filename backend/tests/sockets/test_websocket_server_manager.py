@@ -43,7 +43,7 @@ from app.utils.constants import CHANNEL_PREFIX
 # =============================================================================
 # SHARED FIXTURES
 # =============================================================================
-SAMPLE_TIME = 123456789.0
+MOCK_TIMESTAMP = 123456789.0
 CHANNEL = "test_channel"
 
 
@@ -155,6 +155,13 @@ def clean_singletons():
 async def mock_listen(messages, exception=asyncio.CancelledError):
     """
     Mock listen function for simulating Redis PubSub message listening.
+
+    Parameters
+    ----------
+    messages: ``list``
+        List of messages to yield.
+    exception: ``Exception``
+        Exception to raise after yielding all messages.
     """
     for msg in messages:
         yield msg
@@ -233,7 +240,7 @@ async def test_subscribe_success(mock_redis, mock_logger):
     callback = AsyncMock()
 
     # Mock time.time() to return a consistent value
-    with patch("time.time", return_value=SAMPLE_TIME):
+    with patch("time.time", return_value=MOCK_TIMESTAMP):
         result = await manager.subscribe(CHANNEL, callback)
 
     assert result is True
@@ -241,7 +248,7 @@ async def test_subscribe_success(mock_redis, mock_logger):
     assert manager.subscribed_channels[CHANNEL] == callback
 
     assert CHANNEL in manager.channel_activity
-    assert manager.channel_activity[CHANNEL] == SAMPLE_TIME
+    assert manager.channel_activity[CHANNEL] == MOCK_TIMESTAMP
 
     assert CHANNEL in manager.tasks
 
@@ -278,7 +285,7 @@ async def test_subscribe_already_subscribed(mock_redis, mock_logger):
     callback = AsyncMock()
 
     # First subscription
-    with patch("time.time", return_value=SAMPLE_TIME):
+    with patch("time.time", return_value=MOCK_TIMESTAMP):
         result1 = await manager.subscribe(CHANNEL, callback)
 
     # Second subscription to same channel
@@ -297,7 +304,7 @@ async def test_unsubscribe_success(mock_redis, mock_logger):
     manager = RedisPubSubManager(mock_redis)
 
     # First subscribe
-    with patch("time.time", return_value=SAMPLE_TIME):
+    with patch("time.time", return_value=MOCK_TIMESTAMP):
         await manager.subscribe(CHANNEL, AsyncMock())
 
     # Mock the task to be not done

@@ -209,11 +209,6 @@ def install_twisted_reactor() -> None:
         except Exception as e:
             logger.warning("Failed to set up signal handlers: %s", e)
 
-    # Register atexit handler for when the interpreter is shutting down
-    atexit.register(
-        lambda: loop.run_until_complete(shutdown()) if loop.is_running() else None
-    )
-
 
 def register_shutdown_handler(handler: Callable[[], Any]) -> None:
     """
