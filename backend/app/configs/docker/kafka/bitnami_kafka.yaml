@@ -31,5 +31,4 @@ volumes:
 
 networks:
   kafka_default:
-    driver: bridge
     external: true

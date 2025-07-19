@@ -88,7 +88,7 @@ async def connect_and_subscribe(uri, stocks):
         except websockets.exceptions.InvalidURI:
             logger.error("Invalid WebSocket URI: %s", uri)
             break  # Stop if URI is fundamentally wrong
-        except ConnectionRefusedError as e:
+        except ConnectionRefusedError:
             retry_count += 1
             if retry_count >= max_retries:
                 logger.error("Max retries exceeded. Giving up.")
