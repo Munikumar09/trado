@@ -8,7 +8,7 @@ from app.utils.file_utils import get_symbols, load_json_data, resolve_path
 from app.utils.urls import NSE_F_AND_O_SYMBOLS
 
 
-def test_resolve_path_with_existing_file():
+def test_resolve_path_with_existing_file() -> None:
     """
     Test function to check the resolve_path function with existing file.
 
@@ -38,7 +38,7 @@ def test_resolve_path_with_existing_file():
         resolve_path(non_existing_file_path)
 
 
-def test_load_json_data_with_existing_file():
+def test_load_json_data_with_existing_file() -> None:
     """
     Test function to check if the load_json_data function can load data from an existing
     file. It creates a temporary file, writes data to it, and then tests the function with
@@ -65,7 +65,7 @@ def test_load_json_data_with_existing_file():
         load_json_data(non_existing_file_path)
 
 
-def test_get_symbols_with_existing_file():
+def test_get_symbols_with_existing_file() -> None:
     """
     Test function to check if get_symbols function returns correct data for an existing file.
     """

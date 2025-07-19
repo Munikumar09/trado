@@ -65,7 +65,7 @@ def fetch_data(url: str, max_tries: int = 10) -> Any:
         )
 
 
-def get_required_env_var(name: str) -> str:
+def get_env_var(name: str, default: str | None = None) -> str:
     """
     Get the required environment variable from the system.
 
@@ -73,6 +73,9 @@ def get_required_env_var(name: str) -> str:
     -----------
     name: ``str``
         Name of the environment variable to fetch
+    default: ``str | None`` (default = None)
+        Default value to return if the environment variable is not found.
+        If not provided, a ValueError will be raised if the variable is missing.
 
     Raises:
     -------
@@ -84,7 +87,7 @@ def get_required_env_var(name: str) -> str:
     ``str``
         Value of the environment variable
     """
-    value = os.environ.get(name)
+    value = os.environ.get(name, default)
 
     if not value:
         raise ValueError(f"Missing required environment variable: {name}")

@@ -45,7 +45,7 @@ def connection_cfg() -> dict:
             "debug": False,
         },
         "streaming": {
-            "name": "kafka",
+            "name": "kafka_producer",
             "kafka_topic": "smartsocket",
             "kafka_server": "localhost:23452",
         },
@@ -61,6 +61,11 @@ def connection_cfg() -> dict:
 @pytest.fixture(autouse=True)
 def smart_socket_mock(mocker: MockerFixture):
     return mocker.patch("app.sockets.connections.smartsocket_connection.SmartSocket")
+
+
+@pytest.fixture(autouse=True)
+def mock_producer(mocker: MockerFixture):
+    return mocker.patch("app.sockets.connections.smartsocket_connection.init_from_cfg")
 
 
 @pytest.fixture
@@ -86,7 +91,7 @@ def expected_tokens(websocket_instrument_data):
 
 # Test: 1
 def test_init_from_cfg_valid_cfg(
-    connection_cfg: dict, smart_socket_mock, expected_tokens
+    connection_cfg: dict, smart_socket_mock, mock_producer, expected_tokens
 ):
     """
     Test the initialization of the SmartSocketConnection object from a valid configuration.
@@ -97,7 +102,9 @@ def test_init_from_cfg_valid_cfg(
 
     assert connection is not None
     assert isinstance(connection, SmartSocketConnection)
-    smart_socket_mock.initialize_socket.assert_called_once_with(cfg.provider, None)
+    smart_socket_mock.initialize_socket.assert_called_once_with(
+        cfg.provider, mock_producer.return_value
+    )
     assert smart_socket_mock.mock_calls[1] == call.initialize_socket().set_tokens(
         [{"exchangeType": 1, "tokens": expected_tokens}]
     )

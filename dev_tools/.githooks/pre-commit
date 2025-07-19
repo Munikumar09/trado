@@ -70,6 +70,14 @@ format_check_python_files() {
 		return
 	fi
 
+	# Only include files that currently exist (not deleted/renamed)
+	local existing_files
+	existing_files=$(for f in $files; do [ -f "$f" ] && echo "$f"; done)
+	if [ -z "$existing_files" ]; then
+		echo "✅ No existing Python files to format."
+		return
+	fi
+
 	check_command "black"
 	check_command "isort"
 
@@ -81,22 +89,22 @@ format_check_python_files() {
 	register_tmp_file "$isort_tmp"
 
 	# Use null-separated file names to handle spaces
-	if ! echo "$files" | tr '\n' '\0' | xargs -0 black --check 2>"$black_tmp"; then
+	if ! echo "$existing_files" | tr '\n' '\0' | xargs -0 black --check 2>"$black_tmp"; then
 		echo "--------------------------------------------"
 		echo "❌ Black check failed. Reformatting Python files..."
-		echo "$files" | tr '\n' '\0' | xargs -0 black
-		echo "$files" | tr '\n' '\0' | xargs -0 git add
+		echo "$existing_files" | tr '\n' '\0' | xargs -0 black
+		echo "$existing_files" | tr '\n' '\0' | xargs -0 git add
 		echo "--------------------------------------------"
 		FAILED=1
 	else
 		echo "✅ Black check passed."
 	fi
 
-	if ! echo "$files" | tr '\n' '\0' | xargs -0 isort --profile black --src "$BACKEND_DIR" --check 2>"$isort_tmp"; then
+	if ! echo "$existing_files" | tr '\n' '\0' | xargs -0 isort --profile black --src "$BACKEND_DIR" --check 2>"$isort_tmp"; then
 		echo "--------------------------------------------"
 		echo "❌ Isort check failed. Sorting imports..."
-		echo "$files" | tr '\n' '\0' | xargs -0 isort --profile black --src "$BACKEND_DIR"
-		echo "$files" | tr '\n' '\0' | xargs -0 git add
+		echo "$existing_files" | tr '\n' '\0' | xargs -0 isort --profile black --src "$BACKEND_DIR"
+		echo "$existing_files" | tr '\n' '\0' | xargs -0 git add
 		echo "--------------------------------------------"
 		FAILED=1
 	else
@@ -110,6 +118,14 @@ lint_check_python_files() {
 	files=$(echo "$1" | grep -E "\.py$" || true)
 	if [ -z "$files" ]; then
 		echo "✅ No Python files changed for linting."
+		return
+	fi
+
+	# Only include files that currently exist (not deleted/renamed)
+	local existing_files
+	existing_files=$(for f in $files; do [ -f "$f" ] && echo "$f"; done)
+	if [ -z "$existing_files" ]; then
+		echo "✅ No existing Python files to lint."
 		return
 	fi
 
@@ -133,7 +149,7 @@ lint_check_python_files() {
 	register_tmp_file "$pylint_tmp"
 
 	# Run mypy
-	if ! MYPY_OUTPUT=$(mypy --config-file "$mypy_config" $files 2>&1); then
+	if ! MYPY_OUTPUT=$(mypy --config-file "$mypy_config" $existing_files 2>&1); then
 		echo "--------------------------------------------"
 		echo "❌ Mypy check failed."
 		echo "$MYPY_OUTPUT"
@@ -144,7 +160,7 @@ lint_check_python_files() {
 	fi
 
 	# Run pylint
-	if ! PYLINT_OUTPUT=$(pylint --rcfile "$pylint_config" $files 2>&1); then
+	if ! PYLINT_OUTPUT=$(pylint --rcfile "$pylint_config" $existing_files 2>&1); then
 		echo "--------------------------------------------"
 		echo "❌ Pylint check failed."
 		echo "$PYLINT_OUTPUT"

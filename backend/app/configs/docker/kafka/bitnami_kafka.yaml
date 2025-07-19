@@ -5,6 +5,8 @@ services:
     container_name: kafka1
     ports:
       - 9092:9092
+    networks:
+      - kafka_default
     environment:
       KAFKA_CFG_NODE_ID: 1
       KAFKA_BROKER_ID: 1
@@ -26,3 +28,7 @@ services:
 
 volumes:
   kafka1_data: null
+
+networks:
+  kafka_default:
+    external: true

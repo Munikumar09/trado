@@ -3,6 +3,7 @@ This module is used to connect to the websockets. It will create the multiple
 connections to the websockets based on the configuration.
 """
 
+import time
 from pathlib import Path
 from typing import cast
 
@@ -30,10 +31,11 @@ def create_websocket_connection(cfg: DictConfig):
         The configuration for the websocket connection
     """
     num_connections = cfg.connection.num_connections
+    pre_connection_number = cfg.connection.current_connection_number
 
     for i in range(num_connections):
         logger.info("Creating connection instance %s", i)
-        cfg.connection.current_connection_number = i
+        cfg.connection.current_connection_number = pre_connection_number + i
 
         websocket_connection: WebsocketConnection | None = cast(
             None | WebsocketConnection,
@@ -42,6 +44,8 @@ def create_websocket_connection(cfg: DictConfig):
 
         if websocket_connection:
             websocket_connection.websocket.connect(True)
+
+        time.sleep(0.1)
 
 
 @hydra.main(config_path="../configs", config_name="websocket", version_base=None)

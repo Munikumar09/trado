@@ -3,8 +3,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from kafka import KafkaConsumer
-from kafka.errors import NoBrokersAvailable
+from confluent_kafka import Consumer
+from confluent_kafka.error import KafkaException
 from omegaconf import DictConfig
 from sqlalchemy import create_engine
 
@@ -16,6 +16,11 @@ from app.data_layer.database.db_connections.sqlite import (
 )
 from app.data_layer.database.models import InstrumentPrice
 from app.utils.common.logger import get_logger
+from app.utils.constants import (
+    KAFKA_CONSUMER_DEFAULT_CONFIG,
+    KAFKA_CONSUMER_GROUP_ID_ENV,
+)
+from app.utils.kafka_utils import get_kafka_consumer
 
 logger = get_logger(Path(__file__).name)
 
@@ -24,7 +29,7 @@ logger = get_logger(Path(__file__).name)
 class SqliteDataSaver(DataSaver):
     """
     This SqliteDataSaver retrieve the data from kafka consumer and save it
-    to sqilte database.
+    to sqlite database.
 
     Attributes
     ----------
@@ -38,7 +43,7 @@ class SqliteDataSaver(DataSaver):
         be `data_2021_09_01.sqlite3`
     """
 
-    def __init__(self, consumer: KafkaConsumer, sqlite_db: str | Path) -> None:
+    def __init__(self, consumer: Consumer, sqlite_db: str | Path) -> None:
         self.consumer = consumer
 
         if isinstance(sqlite_db, str):
@@ -107,23 +112,41 @@ class SqliteDataSaver(DataSaver):
         Retrieve the data from the kafka consumer and save it to the sqlite
         database.
         """
-        for message in self.consumer:
-            self.save(message.value)
+        try:
+            while True:
+                data = self.consumer.poll(timeout=1.0)
+
+                if not data:
+                    continue
+
+                if data.error():
+                    raise KafkaException(data.error())
+
+                self.save(data.value())
+        finally:
+            self.consumer.close()
 
     @classmethod
     def from_cfg(cls, cfg: DictConfig) -> Optional["SqliteDataSaver"]:
         try:
+            consumer = get_kafka_consumer(
+                {
+                    "bootstrap.servers": cfg.streaming.kafka_server,
+                    "group.id": KAFKA_CONSUMER_GROUP_ID_ENV,
+                    **KAFKA_CONSUMER_DEFAULT_CONFIG,
+                },
+                cfg.streaming.kafka_topic,
+            )
+
+            sqlite_db_path = cfg.get("sqlite_db")
+            if not sqlite_db_path:
+                logger.error("sqlite_db path not provided in configuration")
+                return None
+
             return cls(
-                KafkaConsumer(
-                    cfg.streaming.kafka_topic,
-                    bootstrap_servers=cfg.streaming.kafka_server,
-                    auto_offset_reset="earliest",
-                ),
-                cfg.get("sqlite_db"),
+                consumer,
+                sqlite_db_path,
             )
-        except NoBrokersAvailable:
-            logger.error(
-                "No Broker is availble at the address: %s. No data will be saved.",
-                cfg.streaming.kafka_server,
-            )
+        except KafkaException as e:
+            logger.error("Error while creating SqliteDataSaver: %s", e)
             return None

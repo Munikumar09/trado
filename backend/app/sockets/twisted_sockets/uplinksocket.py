@@ -36,7 +36,7 @@ class UplinkSocket(MarketDataTwistedSocket):
         The subscription mode is used to specify the type of data to receive from
         the WebSocket server. The subscription mode can be either "ltpc", "option_geeks"
         or "full"
-    on_data_save_callback: ``Callable[[str], None]``, ( default = None )
+    on_data_save_callback: ``Callable[[str, str | None], None]``, ( default = None )
         The callback function that is called when the data is received from the
         WebSocket server
     debug: ``bool``, ( default = False )
@@ -55,7 +55,7 @@ class UplinkSocket(MarketDataTwistedSocket):
         websocket_url: str,
         guid: str,
         subscription_mode: str,
-        on_data_save_callback: Callable[[str], None] | None,
+        on_data_save_callback: Callable[[str, str | None], None] | None,
         debug: bool,
         ping_interval: int,
         ping_message: str,
@@ -319,8 +319,10 @@ class UplinkSocket(MarketDataTwistedSocket):
                 "last_traded_quantity": token_data["ltpc"].get("ltq", -1),
                 "close_price": token_data["ltpc"].get("cp", -1),
             }
+            key = f"{data_to_save['symbol']}_{ExchangeType(data_to_save['exchange_id']).name}"
+
             if self.on_data_save_callback:
-                self.on_data_save_callback(json.dumps(data_to_save))
+                self.on_data_save_callback(json.dumps(data_to_save), key)
 
         if self.debug:
             logger.debug("Received data: %s", data)

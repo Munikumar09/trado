@@ -1,3 +1,7 @@
+import json
+import tempfile
+from unittest.mock import MagicMock
+
 import pytest
 
 from app.utils.common.types.financial_types import DataProviderType, ExchangeType
@@ -67,3 +71,35 @@ def kafka_data() -> list[dict]:
         #     "retrieval_timestamp": 1729532024.31136,
         # },
     ]
+
+
+@pytest.fixture
+def temp_dir():
+    """
+    Create a temporary directory for test files.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield temp_dir
+
+
+@pytest.fixture
+def sample_data_list():
+    """
+    Sample data for testing.
+    """
+    return [
+        {"symbol": "AAPL", "price": 150.25, "volume": 1000, "timestamp": 1640995200},
+        {"symbol": "GOOGL", "price": 2800.50, "volume": 500, "timestamp": 1640995260},
+        {"symbol": "MSFT", "price": 320.75, "volume": 750, "timestamp": 1640995320},
+    ]
+
+
+@pytest.fixture
+def mock_kafka_message(sample_data_list):
+    """
+    Mock Kafka message with valid JSON data.
+    """
+    message = MagicMock()
+    message.error.return_value = None
+    message.value.return_value.decode.return_value = json.dumps(sample_data_list[0])
+    return message

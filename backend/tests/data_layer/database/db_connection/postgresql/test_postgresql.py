@@ -21,7 +21,7 @@ from app.data_layer.database.models import (
     UserVerification,
 )
 from app.utils.common.logger import get_logger
-from app.utils.fetch_data import get_required_env_var
+from app.utils.fetch_data import get_env_var
 
 logger = get_logger(Path(__file__).name)
 
@@ -48,16 +48,16 @@ def create_database_if_not_exists() -> bool:
     conn = None
     try:
         conn = psycopg2.connect(
-            user=get_required_env_var(POSTGRES_USER),
-            password=get_required_env_var(POSTGRES_PASSWORD),
-            host=get_required_env_var(POSTGRES_HOST),
-            port=get_required_env_var(POSTGRES_PORT),
+            user=get_env_var(POSTGRES_USER),
+            password=get_env_var(POSTGRES_PASSWORD),
+            host=get_env_var(POSTGRES_HOST),
+            port=get_env_var(POSTGRES_PORT),
             database="postgres",
         )
         conn.autocommit = True
 
         cursor = conn.cursor()
-        db_name = get_required_env_var(POSTGRES_DB)
+        db_name = get_env_var(POSTGRES_DB)
         quoted_db_name = quote_plus(db_name)
 
         cursor.execute("SELECT 1 FROM pg_database WHERE datname=%s;", (db_name,))
@@ -91,16 +91,16 @@ def drop_database_if_created(created: bool):
     try:
 
         conn = psycopg2.connect(
-            host=get_required_env_var(POSTGRES_HOST),
-            port=get_required_env_var(POSTGRES_PORT),
-            user=get_required_env_var(POSTGRES_USER),
-            password=get_required_env_var(POSTGRES_PASSWORD),
+            host=get_env_var(POSTGRES_HOST),
+            port=get_env_var(POSTGRES_PORT),
+            user=get_env_var(POSTGRES_USER),
+            password=get_env_var(POSTGRES_PASSWORD),
             database="postgres",
         )
         conn.autocommit = True
 
         cursor = conn.cursor()
-        db_name = get_required_env_var(POSTGRES_DB)
+        db_name = get_env_var(POSTGRES_DB)
         quoted_db_name = quote_plus(db_name)
 
         # Terminate other sessions (same as before)
@@ -144,11 +144,11 @@ def test_create_db_and_tables(set_env_vars):
     created = create_database_if_not_exists()
     try:
         db_url = (
-            f"postgresql://{quote_plus(get_required_env_var(POSTGRES_USER))}:"
-            f"{quote_plus(get_required_env_var(POSTGRES_PASSWORD))}@"
-            f"{get_required_env_var(POSTGRES_HOST)}:"
-            f"{get_required_env_var(POSTGRES_PORT)}/"
-            f"{get_required_env_var(POSTGRES_DB)}"
+            f"postgresql://{quote_plus(get_env_var(POSTGRES_USER))}:"
+            f"{quote_plus(get_env_var(POSTGRES_PASSWORD))}@"
+            f"{get_env_var(POSTGRES_HOST)}:"
+            f"{get_env_var(POSTGRES_PORT)}/"
+            f"{get_env_var(POSTGRES_DB)}"
         )
         engine = create_engine(db_url, echo=True)
         inspector = inspect(engine)
