@@ -103,7 +103,7 @@ class KafkaProducer(Producer):
                 success_rate,
             )
 
-    def __call__(self, data: str) -> bool:
+    def __call__(self, data: str, key: str | None = None) -> bool:
         """
         Send data to the configured Kafka topic.
 
@@ -113,7 +113,7 @@ class KafkaProducer(Producer):
 
         Parameters
         ----------
-        data: ``str``
+        data: ``str | None``, ( default = None )
             The data to send to Kafka as a string, typically a JSON-serialized
             object or other string-encoded message format
 
@@ -131,6 +131,7 @@ class KafkaProducer(Producer):
             self.kafka_producer.produce(
                 topic=self.kafka_topic,
                 value=data.encode("utf-8"),
+                key=key.encode("utf-8") if key else None,
                 callback=self.delivery_report,
             )
             # Triggers callbacks for previously sent messages

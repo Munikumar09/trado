@@ -1,6 +1,5 @@
 # pylint: disable=import-outside-toplevel
 import asyncio
-import atexit
 import signal
 import sys
 from asyncio import AbstractEventLoop, CancelledError, Task

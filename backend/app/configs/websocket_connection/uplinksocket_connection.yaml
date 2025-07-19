@@ -6,7 +6,7 @@ name: uplinksocket_connection
 provider:
   guid: uplink0001
   subscription_mode: ltpc # ltpc, option_greeks, full
-  debug: true
+  debug: false
   ping_interval: 25
   ping_message: ping
 streaming: ${kafka}

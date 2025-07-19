@@ -12,6 +12,7 @@ from app.utils.common.types.financial_types import DataProviderType
 from app.utils.smartapi.connection import SmartApiConnection
 from app.utils.smartapi.smartsocket_types import (
     SMARTAPI_EXCHANGETYPE_MAP,
+    ExchangeType,
     SmartAPIExchangeSegment,
     SubscriptionAction,
     SubscriptionMode,
@@ -431,12 +432,13 @@ class SmartSocket(MarketDataTwistedSocket):
         data["exchange_id"] = SMARTAPI_EXCHANGETYPE_MAP[
             self.token_map[data["token"]][1]
         ].value
+        key = f"{data['symbol']}_{ExchangeType(data['exchange_id']).name}"
 
         if self.debug:
             logger.debug("Received data: %s", data)
 
         if self.on_data_save_callback:
-            self.on_data_save_callback(json.dumps(data))
+            self.on_data_save_callback(json.dumps(data), key)
 
     @staticmethod
     def initialize_socket(cfg, on_save_data_callback=None):

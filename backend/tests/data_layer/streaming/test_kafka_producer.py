@@ -305,6 +305,7 @@ def test_call_method_success(basic_kafka_producer):
         topic=KAFKA_TOPIC,
         value=TEST_DATA.encode("utf-8"),
         callback=basic_kafka_producer.delivery_report,
+        key=None,  # Default key is None
     )
     basic_kafka_producer.kafka_producer.poll.assert_called_once_with(0)
 
@@ -554,6 +555,7 @@ def test_large_message_handling(basic_kafka_producer):
         topic=KAFKA_TOPIC,
         value=large_data.encode("utf-8"),
         callback=basic_kafka_producer.delivery_report,
+        key=None,  # Default key is None
     )
 
 
@@ -571,6 +573,7 @@ def test_unicode_message_handling(basic_kafka_producer):
         topic=KAFKA_TOPIC,
         value=unicode_data.encode("utf-8"),
         callback=basic_kafka_producer.delivery_report,
+        key=None,  # Default key is None
     )
 
 
@@ -594,6 +597,7 @@ def test_json_message_handling(basic_kafka_producer):
         topic=KAFKA_TOPIC,
         value=json_data.encode("utf-8"),
         callback=basic_kafka_producer.delivery_report,
+        key=None,  # Default key is None
     )
 
 
@@ -1020,6 +1024,7 @@ def test_message_encoding_edge_cases(basic_kafka_producer):
             topic=KAFKA_TOPIC,
             value=test_case.encode("utf-8"),
             callback=basic_kafka_producer.delivery_report,
+            key=None,  # Default key is None
         )
 
 
