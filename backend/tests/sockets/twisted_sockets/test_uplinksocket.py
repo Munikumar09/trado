@@ -5,6 +5,7 @@ from typing import Any, Dict
 import pytest
 from pytest_mock import MockerFixture, MockType
 
+from app.data_layer.data_models.credential_model import UplinkCredentialOutput
 from app.sockets.twisted_sockets.uplinksocket import UplinkSocket
 from app.utils.common.types.financial_types import DataProviderType
 
@@ -14,11 +15,13 @@ WEBSOCKET_URL = "wss://api.uplink.tech/ws"
 
 
 @pytest.fixture
-def mock_credentials(mocker: MockerFixture) -> MockType:
+def mock_uplink_credential_manager(mocker: MockerFixture) -> MockType:
     """
     Fixture to mock UplinkCredentials.
     """
-    return mocker.patch("app.sockets.twisted_sockets.uplinksocket.UplinkCredentials")
+    return mocker.patch(
+        "app.sockets.twisted_sockets.uplinksocket.UplinkCredentialManager"
+    )
 
 
 @pytest.fixture
@@ -101,36 +104,47 @@ def uplink_socket_instance(
 
 # Test: 1
 def test_initialize_socket_invalid(
-    mock_credentials: MockType, init_config: Dict[str, Any]
+    mock_uplink_credential_manager: MockType, init_config: Dict[str, Any]
 ) -> None:
     """
     Test initializing socket with invalid credentials.
     """
     # Test: 1.1 ( Access token is missing )
-    mock_credentials.get_credentials.return_value = mock_credentials
-    mock_credentials.access_token = None
+    uplink_credential_output = UplinkCredentialOutput(
+        access_token="",
+    )
+    mock_uplink_credential_manager.from_cfg.return_value = (
+        mock_uplink_credential_manager
+    )
+    mock_uplink_credential_manager.credentials = uplink_credential_output
+
     with pytest.raises(ValueError) as val_err:
         UplinkSocket.initialize_socket(init_config)
+
     assert str(val_err.value) == "Access token is missing"
 
     # Test: 1.2 ( Failed to authorize with status code: 401 due to invalid access token )
-    mock_credentials.access_token = "dummy_token"
+    mock_uplink_credential_manager.credentials.access_token = "dummy_token"
+
     with pytest.raises(ValueError) as val_err:
         UplinkSocket.initialize_socket(init_config)
+
     assert str(val_err.value) == "Failed to authorize with status code: 401"
 
 
 # Test: 2
 def test_initialize_socket_valid(
-    mock_credentials: MockType,
+    mock_uplink_credential_manager: MockType,
     init_config: Dict[str, Any],
     mock_requests: MockType,
 ) -> None:
     """
     Test initializing socket with valid credentials.
     """
-    mock_credentials.get_credentials.return_value = mock_credentials
-    mock_credentials.access_token = "valid_token"
+    mock_uplink_credential_manager.get_credentials.return_value = (
+        mock_uplink_credential_manager
+    )
+    mock_uplink_credential_manager.access_token = "valid_token"
     mock_requests.get.return_value.status_code = 200
     mock_requests.get.return_value.json.return_value = {
         "data": {"authorized_redirect_uri": WEBSOCKET_URL}

@@ -5,11 +5,13 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
+from omegaconf import DictConfig
+
 from app.sockets.twisted_socket import MarketDataTwistedSocket
 from app.sockets.websocket_client_protocol import MarketDataWebSocketClientProtocol
 from app.utils.common.logger import get_logger
 from app.utils.common.types.financial_types import DataProviderType
-from app.utils.smartapi.connection import SmartApiConnection
+from app.utils.credentials.smartapi_credential_manager import SmartapiCredentialManager
 from app.utils.smartapi.smartsocket_types import (
     SMARTAPI_EXCHANGETYPE_MAP,
     ExchangeType,
@@ -441,15 +443,18 @@ class SmartSocket(MarketDataTwistedSocket):
             self.on_data_save_callback(json.dumps(data), key)
 
     @staticmethod
-    def initialize_socket(cfg, on_save_data_callback=None):
+    def initialize_socket(cfg, instance_num, on_save_data_callback=None):
         """
         Initialize the SmartSocket connection with the specified configuration.
         """
-        smartapi_connection = SmartApiConnection.get_connection()
-        auth_token = smartapi_connection.get_auth_token()
-        feed_token = smartapi_connection.api.getfeedToken()
-        api_key = smartapi_connection.credentials.api_key
-        client_code = smartapi_connection.credentials.client_id
+        smartapi_connection = SmartapiCredentialManager.from_cfg(
+            DictConfig({"connection_num": instance_num})
+        )
+
+        auth_token = smartapi_connection.credentials.access_token
+        feed_token = smartapi_connection.credentials.feed_token
+        api_key = smartapi_connection.credential_input.api_key
+        client_code = smartapi_connection.credential_input.client_id
 
         return SmartSocket(
             auth_token,

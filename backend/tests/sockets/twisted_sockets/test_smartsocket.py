@@ -6,6 +6,10 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture, MockType
 
+from app.data_layer.data_models.credential_model import (
+    SmartAPICredentialInput,
+    SmartAPICredentialOutput,
+)
 from app.sockets.twisted_sockets import SmartSocket
 from app.utils.smartapi.smartsocket_types import (
     SmartAPIExchangeSegment,
@@ -16,16 +20,43 @@ from app.utils.smartapi.smartsocket_types import (
 
 ####################### Fixtures #######################
 @pytest.fixture
-def mock_connection(mocker: MockerFixture) -> MockType:
+def mock_credential_manager(mocker: MockerFixture) -> MockType:
     """
     Fixture to create a mock SmartApiConnection instance.
     """
-    mock_connection = mocker.patch(
-        "app.sockets.twisted_sockets.smartsocket.SmartApiConnection",
+    mock_credential_manager = mocker.patch(
+        "app.sockets.twisted_sockets.smartsocket.SmartapiCredentialManager",
         autospec=True,
     )
 
-    return mock_connection
+    return mock_credential_manager
+
+
+@pytest.fixture
+def credential_input() -> SmartAPICredentialInput:
+    """
+    Fixture to create a SmartAPICredentialInput instance.
+    """
+    return SmartAPICredentialInput(
+        api_key="mock_api_key",
+        client_id="mock_client_id",
+        pwd="mock_pwd",
+        token="mock_token",
+        connection_num=0,
+    )
+
+
+@pytest.fixture
+def credentials() -> SmartAPICredentialOutput:
+    """
+    Fixture to create a SmartAPICredentialOutput instance.
+    """
+    return SmartAPICredentialOutput(
+        access_token="mock_access_token",
+        refresh_token="mock_refresh_token",
+        feed_token="mock_feed_token",
+        user_id="mock_user_id",
+    )
 
 
 @pytest.fixture
@@ -117,25 +148,27 @@ def get_smartsocket() -> SmartSocket:
 
 
 # Test: 1
-def test_initialize_socket(mock_connection: MockType):
+def test_initialize_socket(
+    mock_credential_manager: MockType,
+    credential_input: SmartAPICredentialInput,
+    credentials: SmartAPICredentialOutput,
+):
     """
     Test initializing the SmartSocket with the SmartApiConnection.
     """
-    mock_connection_instance = mock_connection.get_connection()
-    mock_connection_instance.get_connection.return_value = mock_connection_instance
-    mock_connection_instance.get_auth_token.return_value = "mock_auth_token"
-    mock_connection_instance.api.getfeedToken.return_value = "mock_feed_token"
-    mock_connection_instance.credentials.api_key = "mock_api_key"
-    mock_connection_instance.credentials.client_id = "mock_client_id"
-
+    mock_credential_manager.from_cfg.return_value = mock_credential_manager
+    mock_credential_manager.credentials = credentials
+    mock_credential_manager.credential_input = credential_input
     cfg = {
         "subscription_mode": "quote",
         "debug": True,
         "correlation_id": "correlation_id",
     }
-    socket = SmartSocket.initialize_socket(cfg, on_save_data_callback=MagicMock())
+    socket = SmartSocket.initialize_socket(
+        cfg, instance_num=0, on_save_data_callback=MagicMock()
+    )
 
-    assert socket.headers["Authorization"] == "mock_auth_token"
+    assert socket.headers["Authorization"] == "mock_access_token"
     assert socket.headers["x-api-key"] == "mock_api_key"
     assert socket.headers["x-client-code"] == "mock_client_id"
     assert socket.headers["x-feed-token"] == "mock_feed_token"
@@ -150,17 +183,10 @@ def test_initialize_socket(mock_connection: MockType):
 
 
 # Test: 2
-def test_direct_initialization(mock_connection: MockType):
+def test_direct_initialization():
     """
     Test initializing the SmartSocket with the SmartApiConnection.
     """
-    mock_connection_instance = mock_connection.get_connection()
-    mock_connection_instance.get_connection.return_value = mock_connection_instance
-    mock_connection_instance.get_auth_token.return_value = "mock_auth_token"
-    mock_connection_instance.api.getfeedToken.return_value = "mock_feed_token"
-    mock_connection_instance.credentials.api_key = "mock_api_key"
-    mock_connection_instance.credentials.client_id = "mock_client_id"
-
     socket = SmartSocket(
         auth_token="mock_auth_token",
         api_key="mock_api_key",

@@ -12,7 +12,7 @@ from app.sockets.twisted_socket import MarketDataTwistedSocket
 from app.sockets.websocket_client_protocol import MarketDataWebSocketClientProtocol
 from app.utils.common.logger import get_logger
 from app.utils.common.types.financial_types import DataProviderType, ExchangeType
-from app.utils.credentials.uplink_credentials import UplinkCredentials
+from app.utils.credentials.uplink_credential_manager import UplinkCredentialManager
 from app.utils.urls import UPLINK_WEBSOCKET_AUTH_URL
 
 logger = get_logger(Path(__file__).name, log_level="DEBUG")
@@ -332,10 +332,10 @@ class UplinkSocket(MarketDataTwistedSocket):
         """
         Initialize the UplinkSocket connection with the specified configuration.
         """
-        credentials = UplinkCredentials.get_credentials()
-        access_tokens = credentials.access_token
+        credential_manager = UplinkCredentialManager.from_cfg()
+        access_tokens = credential_manager.credentials.access_token
 
-        if access_tokens is None:
+        if access_tokens == "":
             raise ValueError("Access token is missing")
 
         headers = {

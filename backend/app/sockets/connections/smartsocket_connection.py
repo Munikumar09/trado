@@ -131,7 +131,7 @@ class SmartSocketConnection(WebsocketConnection):
 
             # Initialize SmartSocket only after confirming tokens exist
             smart_socket = SmartSocket.initialize_socket(
-                cfg.provider, save_data_callback
+                cfg.provider, connection_instance_num, save_data_callback
             )
             connection = cls(smart_socket)
 
