@@ -159,6 +159,32 @@ def _reactor_already_installed() -> bool:
     return False
 
 
+def create_handler(signal_value: signal.Signals) -> Callable[[], None]:
+    """
+    Create a signal handler that initiates graceful shutdown when the specified signal is received.
+    This handler will call the `shutdown` function and log the completion or any errors.
+
+    Parameters
+    ----------
+    signal_value: ``signal.Signals``
+        The signal to handle (e.g., SIGINT, SIGTERM)
+
+    Returns
+    -------
+    Callable[[], None]
+        A function that can be used as a signal handler
+    """
+
+    def handler() -> None:
+        fire_and_forgot(
+            shutdown(sig=signal_value),
+            done_callback=lambda t: logger.info("Shutdown task completed: %s", t),
+            error_callback=lambda e: logger.error("Error in shutdown task: %s", e),
+        )
+
+    return handler
+
+
 def install_twisted_reactor() -> None:
     """
     Install the Twisted reactor for asyncio support. This should be called at the beginning
@@ -192,18 +218,7 @@ def install_twisted_reactor() -> None:
     if not sys.platform.startswith("win"):
         try:
             for sig in (signal.SIGTERM, signal.SIGINT):
-                loop.add_signal_handler(
-                    sig,
-                    lambda sig=sig: fire_and_forgot(
-                        shutdown(sig=sig),
-                        done_callback=lambda t: logger.info(
-                            "Shutdown task completed: %s", t
-                        ),
-                        error_callback=lambda e: logger.error(
-                            "Error in shutdown task: %s", e
-                        ),
-                    ),
-                )
+                loop.add_signal_handler(sig, create_handler(sig))
             logger.info("Installed signal handlers for graceful shutdown")
         except Exception as e:
             logger.warning("Failed to set up signal handlers: %s", e)
