@@ -141,10 +141,12 @@ def test_initialize_socket_valid(
     """
     Test initializing socket with valid credentials.
     """
-    mock_uplink_credential_manager.get_credentials.return_value = (
+    mock_uplink_credential_manager.from_cfg.return_value = (
         mock_uplink_credential_manager
     )
-    mock_uplink_credential_manager.access_token = "valid_token"
+    mock_uplink_credential_manager.credentials = UplinkCredentialOutput(
+        access_token="valid_token"
+    )
     mock_requests.get.return_value.status_code = 200
     mock_requests.get.return_value.json.return_value = {
         "data": {"authorized_redirect_uri": WEBSOCKET_URL}

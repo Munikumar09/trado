@@ -1,4 +1,4 @@
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-lines
 """
 Unit tests for SmartapiCredentialManager class.
 
@@ -6,13 +6,17 @@ This module contains comprehensive unit tests for the SmartapiCredentialManager
 class, testing all methods, edge cases, and error scenarios.
 """
 
+from collections import defaultdict
 from datetime import datetime, timedelta
+from queue import Queue
+from threading import Thread
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 import redis
 from omegaconf import DictConfig
+from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 
 from app.data_layer.data_models.credential_model import (
@@ -151,56 +155,211 @@ class TestSmartapiCredentialManagerInit:
             manager, mock_smartapi_credential_input, mock_smartapi_credential_output
         )
 
-    def test_init_from_cfg_with_default_index(
+    def test_from_cfg_with_none_config(
         self,
         mock_smartapi_credential_output: SmartAPICredentialOutput,
         mock_smartapi_credential_input: SmartAPICredentialInput,
+        mock_logger: MagicMock,
     ):
         """
-        Test SmartapiCredentialManager initialization from configuration with default index.
+        Test from_cfg method with None configuration.
         """
-        manager = SmartapiCredentialManager.from_cfg()
+        manager = SmartapiCredentialManager.from_cfg(None)
         assert isinstance(manager, SmartapiCredentialManager)
         self.validate_instance(
             manager, mock_smartapi_credential_input, mock_smartapi_credential_output, 1
         )
 
-        # Check if the current connection is incremented
-        manager = SmartapiCredentialManager.from_cfg()
+        # Verify that logger.info was called for default connection
+        mock_logger.info.assert_called_with(
+            "Connection number is not provided, using default connection number: %d",
+            0,
+        )
+
+    def test_from_cfg_with_connection_exceeding_total(
+        self,
+        mock_smartapi_credential_output: SmartAPICredentialOutput,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test from_cfg method when connection number exceeds total connections.
+        """
+        mock_smartapi_credential_input.connection_num = 1  # connection_num after modulo
+        manager = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": 10}))
         assert isinstance(manager, SmartapiCredentialManager)
-        mock_smartapi_credential_input.connection_num += 1
         self.validate_instance(
             manager, mock_smartapi_credential_input, mock_smartapi_credential_output, 2
         )
 
-    def test_init_from_cfg_with_zero_index(
+        # Verify that logger.info was called for modulo operation
+        mock_logger.info.assert_called_with(
+            "Connection number %d exceeds total connections %d, using modulo: %d",
+            10,
+            3,
+            1,
+        )
+
+    def test_from_cfg_environment_variable_error(
+        self,
+        monkeypatch: MonkeyPatch,
+    ):
+        """
+        Test from_cfg method when environment variable retrieval fails.
+        """
+        monkeypatch.delenv("SMARTAPI_API_KEY", raising=False)
+
+        with pytest.raises(
+            Exception, match="Missing required environment variable: SMARTAPI_API_KEY"
+        ):
+            SmartapiCredentialManager.from_cfg()
+
+    def test_from_cfg_generate_credentials_failure(
+        self,
+        mocker,
+    ):
+        """
+        Test from_cfg method when generate_credentials fails.
+        """
+        # Mock generate_credentials to raise an exception
+        mock_generate_credentials = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.SmartapiCredentialManager.generate_credentials"
+        )
+        mock_generate_credentials.side_effect = Exception(
+            "Failed to generate credentials"
+        )
+
+        with pytest.raises(Exception, match="Failed to generate credentials"):
+            SmartapiCredentialManager.from_cfg()
+
+    def test_from_cfg_current_connection_increment(
+        self,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+        mock_smartapi_credential_output: SmartAPICredentialOutput,
+    ):
+        """
+        Test from_cfg method current connection increment behavior.
+        """
+        # Test sequential calls increment connection properly
+        mock_smartapi_credential_input.connection_num = 0
+        manager1 = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": 0}))
+        self.validate_instance(
+            manager1, mock_smartapi_credential_input, mock_smartapi_credential_output, 1
+        )
+
+        mock_smartapi_credential_input.connection_num = 1
+        manager2 = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": 1}))
+        self.validate_instance(
+            manager2, mock_smartapi_credential_input, mock_smartapi_credential_output, 2
+        )
+
+        mock_smartapi_credential_input.connection_num = 2
+        manager3 = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": 2}))
+        self.validate_instance(
+            manager3, mock_smartapi_credential_input, mock_smartapi_credential_output, 0
+        )
+
+        # Test with connection_num exceeding total connections
+        mock_smartapi_credential_input.connection_num = 0
+        manager4 = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": 3}))
+        self.validate_instance(
+            manager4, mock_smartapi_credential_input, mock_smartapi_credential_output, 1
+        )
+
+    def test_from_cfg_with_empty_config(
         self,
         mock_smartapi_credential_output: SmartAPICredentialOutput,
         mock_smartapi_credential_input: SmartAPICredentialInput,
+        mock_logger: MagicMock,
     ):
         """
-        Test SmartapiCredentialManager initialization from configuration with zero index.
+        Test from_cfg method with empty DictConfig.
         """
-        manager = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": 0}))
+        manager = SmartapiCredentialManager.from_cfg(DictConfig({}))
         assert isinstance(manager, SmartapiCredentialManager)
         self.validate_instance(
             manager, mock_smartapi_credential_input, mock_smartapi_credential_output, 1
         )
 
-    def test_init_from_cfg_with_higher_index(
+        # Verify that logger.info was called for default connection
+        mock_logger.info.assert_called_with(
+            "Connection number is not provided, using default connection number: %d",
+            0,
+        )
+
+    def test_from_cfg_with_negative_connection_num(
         self,
         mock_smartapi_credential_output: SmartAPICredentialOutput,
         mock_smartapi_credential_input: SmartAPICredentialInput,
     ):
         """
-        Test SmartapiCredentialManager initialization from configuration with a higher index.
+        Test from_cfg method with negative connection number.
         """
-        mock_smartapi_credential_input.connection_num = 2
-        manager = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": 5}))
+        # -1 is NOT > 3, so no modulo operation is performed
+        mock_smartapi_credential_input.connection_num = -1  # input keeps original value
+        manager = SmartapiCredentialManager.from_cfg(DictConfig({"connection_num": -1}))
         assert isinstance(manager, SmartapiCredentialManager)
         self.validate_instance(
-            manager, mock_smartapi_credential_input, mock_smartapi_credential_output, 0
+            manager,
+            mock_smartapi_credential_input,
+            mock_smartapi_credential_output,
+            0,  # (-1 + 1) % 3 = 0
         )
+
+    def test_from_cfg_with_multiple_threads(
+        self,
+        mock_smartapi_credential_output: SmartAPICredentialOutput,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+    ):
+        """
+        Test from_cfg method with multiple threads.
+        """
+
+        def worker(connection_num: int, result_queue: Queue):
+            """
+            Worker function to create SmartapiCredentialManager instance.
+            """
+            manager = SmartapiCredentialManager.from_cfg(
+                DictConfig({"connection_num": connection_num})
+            )
+            result_queue.put((manager, manager.credential_input.connection_num))
+
+        result_queue: Queue = Queue()
+
+        # Create multiple threads to test concurrent access
+        threads = []
+        for i in range(5):
+            thread = Thread(
+                target=worker,
+                args=(i, result_queue),
+            )
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        connection_num_freq: defaultdict[int, int] = defaultdict(int)
+
+        while not result_queue.empty():
+            manager, current_connection = result_queue.get()
+            connection_num_freq[current_connection] += 1
+            mock_smartapi_credential_input.connection_num = (
+                manager.credential_input.connection_num
+            )
+
+            self.validate_instance(
+                manager,
+                mock_smartapi_credential_input,
+                mock_smartapi_credential_output,
+                manager.current_connection,
+            )
+
+        assert connection_num_freq == {
+            0: 2,
+            1: 2,
+            2: 1,
+        }, "Connection numbers should be distributed across threads evenly"
 
     def test_init_from_cfg(
         self,
@@ -334,6 +493,212 @@ class TestSmartapiCredentialManagerGenerateNewCredentials:
         mock_pyotp.TOTP.assert_called_once_with("test_token")
         mock_smart_connect.generateSession.assert_called_once_with(
             "test_client_id", "test_password", "123456"
+        )
+
+    def test_generate_new_credentials_missing_data_field(
+        self,
+        mocker,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+        smartapi_credential_manager: SmartapiCredentialManager,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _generate_new_credentials method when API response is missing 'data' field.
+        """
+        mock_smart_connect_class = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.SmartConnect"
+        )
+        mock_pyotp = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.pyotp"
+        )
+
+        # Setup mocks
+        mock_smart_connect = MagicMock()
+        mock_smart_connect.generateSession.return_value = {"status": "error"}
+        mock_smart_connect_class.return_value = mock_smart_connect
+
+        mock_totp_instance = MagicMock()
+        mock_totp_instance.now.return_value = "123456"
+        mock_pyotp.TOTP.return_value = mock_totp_instance
+
+        with pytest.raises(
+            ValueError, match="Invalid response from SmartAPI: missing 'data' field"
+        ):
+            smartapi_credential_manager._generate_new_credentials(
+                mock_smartapi_credential_input
+            )
+
+        # Verify that logger.error was called
+        mock_logger.error.assert_called_once()
+        assert "Failed to generate SmartAPI credentials" in str(
+            mock_logger.error.call_args
+        )
+
+    def test_generate_new_credentials_missing_required_fields(
+        self,
+        mocker,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+        smartapi_credential_manager: SmartapiCredentialManager,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _generate_new_credentials method when API response is missing required fields.
+        """
+        mock_smart_connect_class = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.SmartConnect"
+        )
+        mock_pyotp = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.pyotp"
+        )
+
+        # Setup mocks with incomplete data
+        mock_smart_connect = MagicMock()
+        incomplete_response = {
+            "data": {
+                "jwtToken": "test_jwt",
+                "refreshToken": "test_refresh",
+                # Missing feedToken and clientcode
+            }
+        }
+        mock_smart_connect.generateSession.return_value = incomplete_response
+        mock_smart_connect_class.return_value = mock_smart_connect
+
+        mock_totp_instance = MagicMock()
+        mock_totp_instance.now.return_value = "123456"
+        mock_pyotp.TOTP.return_value = mock_totp_instance
+
+        with pytest.raises(
+            ValueError,
+            match="Missing fields in SmartAPI response: \\['feedToken', 'clientcode'\\]",
+        ):
+            smartapi_credential_manager._generate_new_credentials(
+                mock_smartapi_credential_input
+            )
+
+        # Verify that logger.error was called
+        mock_logger.error.assert_called_once()
+        assert "Failed to generate SmartAPI credentials" in str(
+            mock_logger.error.call_args
+        )
+
+    def test_generate_new_credentials_smartconnect_exception(
+        self,
+        mocker,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+        smartapi_credential_manager: SmartapiCredentialManager,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _generate_new_credentials method when SmartConnect raises an exception.
+        """
+        mock_smart_connect_class = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.SmartConnect"
+        )
+        mock_pyotp = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.pyotp"
+        )
+
+        # Setup mocks to raise exception
+        mock_smart_connect = MagicMock()
+        mock_smart_connect.generateSession.side_effect = Exception(
+            "API connection failed"
+        )
+        mock_smart_connect_class.return_value = mock_smart_connect
+
+        mock_totp_instance = MagicMock()
+        mock_totp_instance.now.return_value = "123456"
+        mock_pyotp.TOTP.return_value = mock_totp_instance
+
+        with pytest.raises(Exception, match="API connection failed"):
+            smartapi_credential_manager._generate_new_credentials(
+                mock_smartapi_credential_input
+            )
+
+        # Verify that logger.error was called
+        mock_logger.error.assert_called_once()
+        assert "Failed to generate SmartAPI credentials" in str(
+            mock_logger.error.call_args
+        )
+
+    def test_generate_new_credentials_totp_exception(
+        self,
+        mocker,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+        smartapi_credential_manager: SmartapiCredentialManager,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _generate_new_credentials method when TOTP generation fails.
+        """
+        mock_smart_connect_class = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.SmartConnect"
+        )
+        mock_pyotp = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.pyotp"
+        )
+
+        # Setup mocks
+        mock_smart_connect_class.return_value = MagicMock()
+
+        # Make TOTP raise an exception
+        mock_pyotp.TOTP.side_effect = Exception("Invalid TOTP token")
+
+        with pytest.raises(Exception, match="Invalid TOTP token"):
+            smartapi_credential_manager._generate_new_credentials(
+                mock_smartapi_credential_input
+            )
+
+        # Verify that logger.error was called
+        mock_logger.error.assert_called_once()
+        assert "Failed to generate SmartAPI credentials" in str(
+            mock_logger.error.call_args
+        )
+
+    def test_generate_new_credentials_partial_missing_fields(
+        self,
+        mocker,
+        mock_smartapi_credential_input: SmartAPICredentialInput,
+        smartapi_credential_manager: SmartapiCredentialManager,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _generate_new_credentials method with only one missing field.
+        """
+        mock_smart_connect_class = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.SmartConnect"
+        )
+        mock_pyotp = mocker.patch(
+            "app.utils.credentials.smartapi_credential_manager.pyotp"
+        )
+
+        # Setup mocks with missing only clientcode
+        mock_smart_connect = MagicMock()
+        incomplete_response = {
+            "data": {
+                "jwtToken": "test_jwt",
+                "refreshToken": "test_refresh",
+                "feedToken": "test_feed",
+                # Missing only clientcode
+            }
+        }
+        mock_smart_connect.generateSession.return_value = incomplete_response
+        mock_smart_connect_class.return_value = mock_smart_connect
+
+        mock_totp_instance = MagicMock()
+        mock_totp_instance.now.return_value = "123456"
+        mock_pyotp.TOTP.return_value = mock_totp_instance
+
+        with pytest.raises(
+            ValueError, match="Missing fields in SmartAPI response: \\['clientcode'\\]"
+        ):
+            smartapi_credential_manager._generate_new_credentials(
+                mock_smartapi_credential_input
+            )
+
+        # Verify that logger.error was called
+        mock_logger.error.assert_called_once()
+        assert "Failed to generate SmartAPI credentials" in str(
+            mock_logger.error.call_args
         )
 
 

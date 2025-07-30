@@ -15,6 +15,7 @@ Features:
 - Uses TOTP (Time-based One-Time Password) for secure authentication.
 """
 
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -52,6 +53,7 @@ class SmartapiCredentialManager(
         The output credentials generated from the input credentials
     """
 
+    _connection_lock = threading.Lock()
     total_connections = 3
     current_connection = 0
 
@@ -87,10 +89,10 @@ class SmartapiCredentialManager(
             pipe.hgetall(key)
 
             results = pipe.execute()
-            key, value = results
+            redis_type, hash_data = results
 
-            if key == "hash":
-                return SmartAPICredentialOutput(**value)
+            if redis_type == "hash":
+                return SmartAPICredentialOutput(**hash_data)
 
             return None
         except redis.RedisError as e:
@@ -113,17 +115,36 @@ class SmartapiCredentialManager(
         ``SmartAPICredentialOutput``
             The output credentials generated from the input credentials
         """
-        smart_connect = SmartConnect(credential_input.api_key)
-        totp = pyotp.TOTP(credential_input.token).now()
-        data = smart_connect.generateSession(
-            credential_input.client_id, credential_input.pwd, totp
-        )
-        return SmartAPICredentialOutput(
-            access_token=data["data"]["jwtToken"],
-            refresh_token=data["data"]["refreshToken"],
-            feed_token=data["data"]["feedToken"],
-            user_id=data["data"]["clientcode"],
-        )
+        try:
+            smart_connect = SmartConnect(credential_input.api_key)
+            totp = pyotp.TOTP(credential_input.token).now()
+            data = smart_connect.generateSession(
+                credential_input.client_id, credential_input.pwd, totp
+            )
+
+            if "data" not in data:
+                raise ValueError("Invalid response from SmartAPI: missing 'data' field")
+
+            session_data = data["data"]
+            required_fields = ["jwtToken", "refreshToken", "feedToken", "clientcode"]
+            missing_fields = [
+                field for field in required_fields if field not in session_data
+            ]
+
+            if missing_fields:
+                raise ValueError(
+                    f"Missing fields in SmartAPI response: {missing_fields}"
+                )
+
+            return SmartAPICredentialOutput(
+                access_token=session_data["jwtToken"],
+                refresh_token=session_data["refreshToken"],
+                feed_token=session_data["feedToken"],
+                user_id=session_data["clientcode"],
+            )
+        except Exception as e:
+            logger.error("Failed to generate SmartAPI credentials: %s", e)
+            raise
 
     def get_next_expiry_time(self) -> int:
         """
@@ -207,8 +228,6 @@ class SmartapiCredentialManager(
         -----------
         credential_input: ``SmartAPICredentialInput``
             The input credentials required to generate the output credentials
-        connection_num: ``int``
-            The connection number to use for the credentials generation
 
         Returns:
         --------
@@ -268,11 +287,13 @@ class SmartapiCredentialManager(
                 "Connection number is not provided, using default connection number: %d",
                 connection_num,
             )
-        if connection_num > cls.total_connections:
+        if connection_num >= cls.total_connections:
+            original_connection_num = connection_num
             connection_num = connection_num % cls.total_connections
             logger.info(
-                "Connection number %d exceeds total connections, using modulo: %d",
-                connection_num,
+                "Connection number %d exceeds total connections %d, using modulo: %d",
+                original_connection_num,
+                cls.total_connections,
                 connection_num,
             )
 
@@ -290,7 +311,8 @@ class SmartapiCredentialManager(
         )
         smart_credentials = cls.generate_credentials(smart_credential_input)
 
-        cls.current_connection = (connection_num + 1) % cls.total_connections
+        with cls._connection_lock:
+            cls.current_connection = (connection_num + 1) % cls.total_connections
 
         return cls(
             smart_credential_input,

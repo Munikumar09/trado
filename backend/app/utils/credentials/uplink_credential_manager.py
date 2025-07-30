@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -69,18 +70,16 @@ class UplinkCredentialManager(
     ) -> UplinkCredentialOutput | None:
         """
         Check if the access token is cached in Redis
-
         Parameters
         ----------
         redis_client: ``Redis``
             The Redis client to use for checking the cache
         key: ``str``
             The key to check in Redis
-
         Returns
         -------
-        access_token: ``str | None``
-            The cached access token if it exists, otherwise None
+        ``UplinkCredentialOutput | None``
+            The cached credentials if they exist, otherwise None
         """
         try:
             pipe = redis_client.pipeline()
@@ -88,15 +87,14 @@ class UplinkCredentialManager(
             pipe.hgetall(key)
 
             results = pipe.execute()
-            key, value = results
+            key_type, value = results
 
-            if key == "hash":
+            if key_type == b"hash" and value:
                 return UplinkCredentialOutput(**value)
 
             return None
         except RedisError as e:
             logger.error("Redis error while checking cache for key %s: %s", key, e)
-
             return None
 
     def cache_credentials(
@@ -151,54 +149,56 @@ class UplinkCredentialManager(
             The authorization code if successful, otherwise None
         """
         browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+        try:
+            context = browser.new_context()
+            page = context.new_page()
 
-        # Expect a request containing the redirect URI with the authorization code
-        with page.expect_request(f"*{REDIRECT_URI}/?code*") as request:
-            page.goto(auth_url)
+            # Expect a request containing the redirect URI with the authorization code
+            with page.expect_request(f"*{REDIRECT_URI}/?code*") as request:
+                page.goto(auth_url)
 
-            # Enter mobile number
-            page.locator("#mobileNum").fill(credential_input.mobile_no)
-            page.get_by_role("button", name="Get OTP").click()
+                # Enter mobile number
+                page.locator("#mobileNum").fill(credential_input.mobile_no)
+                page.get_by_role("button", name="Get OTP").click()
 
-            # Enter OTP
-            otp = pyotp.TOTP(credential_input.totp_key).now()
-            page.locator("#otpNum").fill(otp)
-            page.get_by_role("button", name="Continue").click()
+                # Enter OTP
+                otp = pyotp.TOTP(credential_input.totp_key).now()
+                page.locator("#otpNum").fill(otp)
+                page.get_by_role("button", name="Continue").click()
 
-            # Enter PIN
-            page.get_by_label("Enter 6-digit PIN").fill(credential_input.pin)
-            page.get_by_role("button", name="Continue").click()
+                # Enter PIN
+                page.get_by_label("Enter 6-digit PIN").fill(credential_input.pin)
+                page.get_by_role("button", name="Continue").click()
 
-            # Wait for navigation to complete
-            page.wait_for_load_state()
+                # Wait for navigation to complete
+                page.wait_for_load_state()
 
-        # Extract authorization code from redirect URL
-        url = request.value.url
-        parsed_url = urlparse(url)
-        auth_code_list = parse_qs(parsed_url.query).get("code", [])
-        auth_code = auth_code_list[0] if auth_code_list else None
+            # Extract authorization code from redirect URL
+            url = request.value.url
+            parsed_url = urlparse(url)
+            auth_code_list = parse_qs(parsed_url.query).get("code", [])
+            auth_code = auth_code_list[0] if auth_code_list else None
 
-        # Close browser
-        context.close()
-        browser.close()
-
-        return auth_code
+            return auth_code
+        except Exception as e:
+            logger.error("Error during browser automation: %s", e)
+            raise
+        finally:
+            # Ensure browser resources are always cleaned up
+            context.close()
+            browser.close()
 
     def get_access_token(
         self, credential_input: UplinkCredentialInput, code: str
     ) -> str:
         """
         Create an access token using the authorization code by making a POST request to the Uplink API
-
         Parameters
         ----------
         credential_input: ``UplinkCredentialInput``
             The input data containing API key, secret key, TOTP key, mobile number, and PIN
         code: ``str``
             The authorization code received after successful login
-
         Returns
         -------
         access_token: ``str``
@@ -208,7 +208,6 @@ class UplinkCredentialManager(
             "accept": "application/json",
             "Content-Type": "application/x-www-form-urlencoded",
         }
-
         data = {
             "code": code,
             "client_id": credential_input.api_key,
@@ -216,19 +215,24 @@ class UplinkCredentialManager(
             "redirect_uri": REDIRECT_URI,
             "grant_type": "authorization_code",
         }
-
-        response = requests.post(
-            UPLINK_ACCESS_TOKEN_URL, headers=headers, data=data, timeout=10
-        )
-        json_response = response.json()
-        access_token = json_response.get("access_token", None)
-
-        if not access_token:
-            raise ValueError(
-                f"Failed to get access token: {json_response.get('error_description', 'Unknown error')}"
+        try:
+            response = requests.post(
+                UPLINK_ACCESS_TOKEN_URL, headers=headers, data=data, timeout=10
             )
-
-        return access_token
+            response.raise_for_status()
+            json_response = response.json()
+            access_token = json_response.get("access_token", None)
+            if not access_token:
+                raise ValueError(
+                    f"Failed to get access token: {json_response.get('error_description', 'Unknown error')}"
+                )
+            return access_token
+        except json.JSONDecodeError as e:
+            logger.error("Failed to decode JSON response: %s", e)
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error("Failed to request access token: %s", e)
+            raise
 
     def _generate_new_credentials(
         self, credential_input: UplinkCredentialInput

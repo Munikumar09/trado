@@ -9,11 +9,10 @@ from app.data_layer.data_models.credential_model import (
 )
 
 
-@abstractmethod
 class CredentialManager[CI: CredentialInput, CO: CredentialOutput](Registrable, ABC):
     """
     Base class for credentials used in the market data API. Subclasses of
-    `CredentialManager` should implement the `get_credentials` method to provide
+    `CredentialManager` should implement the `generate_credentials` method to provide
     the actual credentials.
     """
 

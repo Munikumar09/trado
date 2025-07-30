@@ -1,0 +1,87 @@
+interactions:
+- request:
+    body: '{"exchange": "NSE", "tradingsymbol": "ACC", "interval": "ONE_MINUTE", "fromdate":
+      "2023-10-05 12:00", "todate": "2023-10-05 12:20", "symboltoken": "22"}'
+    headers:
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      X-ClientLocalIP:
+      - CLIENT_LOCAL_IP
+      X-ClientPublicIP:
+      - CLIENT_PUBLIC_IP
+      X-MACAddress:
+      - MAC_ADDRESS
+      X-PrivateKey:
+      - zQi2vgME
+      X-SourceID:
+      - WEB
+      X-UserType:
+      - USER
+    method: POST
+    uri: https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData
+  response:
+    body:
+      string: '{"status":true,"message":"SUCCESS","errorcode":"","data":[["2023-10-05T12:00:00+05:30",1999.85,2000.3,1999.3,2000.3,63],["2023-10-05T12:01:00+05:30",2000.4,2001.0,2000.3,2001.0,23],["2023-10-05T12:02:00+05:30",2000.25,2003.1,2000.25,2003.1,517],["2023-10-05T12:03:00+05:30",2003.1,2003.9,2002.65,2003.9,250],["2023-10-05T12:04:00+05:30",2003.95,2004.15,2003.55,2004.15,630],["2023-10-05T12:05:00+05:30",2004.0,2004.0,2003.05,2003.25,44],["2023-10-05T12:06:00+05:30",2003.2,2004.25,2003.2,2004.25,138],["2023-10-05T12:07:00+05:30",2004.5,2005.0,2004.1,2004.7,128],["2023-10-05T12:08:00+05:30",2004.5,2004.5,2003.0,2003.0,63],["2023-10-05T12:09:00+05:30",2003.95,2003.95,2003.95,2003.95,2],["2023-10-05T12:10:00+05:30",2003.7,2004.2,2002.95,2002.95,129],["2023-10-05T12:11:00+05:30",2003.05,2003.8,2002.85,2003.8,100],["2023-10-05T12:12:00+05:30",2003.1,2003.95,2003.1,2003.95,100],["2023-10-05T12:13:00+05:30",2003.8,2003.95,2003.05,2003.05,117],["2023-10-05T12:14:00+05:30",2003.95,2003.95,2003.95,2003.95,1],["2023-10-05T12:15:00+05:30",2002.75,2004.0,2002.75,2003.75,218],["2023-10-05T12:16:00+05:30",2003.8,2003.8,2001.95,2002.75,143],["2023-10-05T12:17:00+05:30",2002.8,2002.8,2002.8,2002.8,1],["2023-10-05T12:18:00+05:30",2001.8,2001.8,2001.8,2001.8,1],["2023-10-05T12:19:00+05:30",2001.8,2001.8,2001.3,2001.3,35],["2023-10-05T12:20:00+05:30",2001.05,2001.7,2001.05,2001.7,8]]}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'false'
+      Access-Control-Allow-Headers:
+      - Content-type,X-Requested-With,Origin,accept,Authorization,X-SourceID,X-ClientLocalIP,X-ClientPublicIP,X-MACaddress,X-PrivateKey,X-UserType,Access-Control-Allow-Origin
+      Access-Control-Allow-Methods:
+      - POST, GET, OPTIONS
+      Access-Control-Max-Age:
+      - '3600'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1382'
+      Content-Security-Policy:
+      - default-src 'self'; frame-ancestors 'self' https://*.angelbroking.com; https://*.angelone.in;
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 30 Jul 2025 03:32:45 GMT
+      Referrer-Policy:
+      - strict-origin
+      Set-Cookie: '[REDACTED]'
+      Strict-Transport-Security:
+      - max-age=31536000
+      - max-age=31536000
+      Vary:
+      - Accept-Encoding
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+    status:
+      code: 200
+      message: ''
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - testserver
+      user-agent:
+      - testclient
+    method: GET
+    uri: http://testserver/smart-api/equity/history/ACC?end_date=2023-10-05+12%3A20&interval=one+minute&start_date=2023-10-5+12%3A0
+  response:
+    body:
+      string: '{"available_stock_data":[{"timestamp":"2023-10-05T12:00:00+05:30","open":1999.85,"high":2000.3,"low":1999.3,"close":2000.3,"volume":63,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:01:00+05:30","open":2000.4,"high":2001.0,"low":2000.3,"close":2001.0,"volume":23,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:02:00+05:30","open":2000.25,"high":2003.1,"low":2000.25,"close":2003.1,"volume":517,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:03:00+05:30","open":2003.1,"high":2003.9,"low":2002.65,"close":2003.9,"volume":250,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:04:00+05:30","open":2003.95,"high":2004.15,"low":2003.55,"close":2004.15,"volume":630,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:05:00+05:30","open":2004.0,"high":2003.25,"low":2003.05,"close":2004.0,"volume":44,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:06:00+05:30","open":2003.2,"high":2004.25,"low":2003.2,"close":2004.25,"volume":138,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:07:00+05:30","open":2004.5,"high":2004.7,"low":2004.1,"close":2005.0,"volume":128,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:08:00+05:30","open":2004.5,"high":2003.0,"low":2003.0,"close":2004.5,"volume":63,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:09:00+05:30","open":2003.95,"high":2003.95,"low":2003.95,"close":2003.95,"volume":2,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:10:00+05:30","open":2003.7,"high":2002.95,"low":2002.95,"close":2004.2,"volume":129,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:11:00+05:30","open":2003.05,"high":2003.8,"low":2002.85,"close":2003.8,"volume":100,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:12:00+05:30","open":2003.1,"high":2003.95,"low":2003.1,"close":2003.95,"volume":100,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:13:00+05:30","open":2003.8,"high":2003.05,"low":2003.05,"close":2003.95,"volume":117,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:14:00+05:30","open":2003.95,"high":2003.95,"low":2003.95,"close":2003.95,"volume":1,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:15:00+05:30","open":2002.75,"high":2003.75,"low":2002.75,"close":2004.0,"volume":218,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:16:00+05:30","open":2003.8,"high":2002.75,"low":2001.95,"close":2003.8,"volume":143,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:17:00+05:30","open":2002.8,"high":2002.8,"low":2002.8,"close":2002.8,"volume":1,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:18:00+05:30","open":2001.8,"high":2001.8,"low":2001.8,"close":2001.8,"volume":1,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:19:00+05:30","open":2001.8,"high":2001.3,"low":2001.3,"close":2001.8,"volume":35,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-05T12:20:00+05:30","open":2001.05,"high":2001.7,"low":2001.05,"close":2001.7,"volume":8,"stock_symbol":"ACC","candle_interval":"ONE_MINUTE"}],"missing_timestamps":[]}'
+    headers:
+      content-length:
+      - '3494'
+      content-type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

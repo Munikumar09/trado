@@ -1,0 +1,84 @@
+interactions:
+- request:
+    body: '{"exchange": "NSE", "tradingsymbol": "TCS", "symboltoken": "11536"}'
+    headers:
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      X-ClientLocalIP:
+      - CLIENT_LOCAL_IP
+      X-ClientPublicIP:
+      - CLIENT_PUBLIC_IP
+      X-MACAddress:
+      - MAC_ADDRESS
+      X-PrivateKey:
+      - zQi2vgME
+      X-SourceID:
+      - WEB
+      X-UserType:
+      - USER
+    method: POST
+    uri: https://apiconnect.angelbroking.com/rest/secure/angelbroking/order/v1/getLtpData
+  response:
+    body:
+      string: '{"status":true,"message":"SUCCESS","errorcode":"","data":{"exchange":"NSE","tradingsymbol":"TCS-EQ","symboltoken":"11536","open":3056.0,"high":3074.0,"low":3041.2,"close":3079.3,"ltp":3056.0}}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'false'
+      Access-Control-Allow-Headers:
+      - Content-type,X-Requested-With,Origin,accept,Authorization,X-SourceID,X-ClientLocalIP,X-ClientPublicIP,X-MACaddress,X-PrivateKey,X-UserType,x-forwarded-for,X-Forwarded-For,Access-Control-Allow-Origin
+      Access-Control-Allow-Methods:
+      - POST, GET, OPTIONS
+      Access-Control-Max-Age:
+      - '3600'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '192'
+      Content-Security-Policy:
+      - default-src 'self'; frame-ancestors 'self' https://*.angelbroking.com; https://*.angelone.in;
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 30 Jul 2025 03:32:42 GMT
+      Referrer-Policy:
+      - strict-origin
+      Set-Cookie: '[REDACTED]'
+      Strict-Transport-Security:
+      - max-age=31536000
+      - max-age=31536000
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+    status:
+      code: 200
+      message: ''
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - testserver
+      user-agent:
+      - testclient
+    method: GET
+    uri: http://testserver/smart-api/equity/price/TCS
+  response:
+    body:
+      string: '{"symbol":"TCS-EQ","last_traded_price":3056.0,"day_open":3056.0,"day_low":3041.2,"day_high":3074.0,"change":-23.300000000000182,"percent_change":-0.7566654759198578,"symbol_token":"11536","prev_day_close":3079.3}'
+    headers:
+      content-length:
+      - '212'
+      content-type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

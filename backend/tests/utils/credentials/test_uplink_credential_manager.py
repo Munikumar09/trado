@@ -1,4 +1,4 @@
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-lines
 """
 Unit tests for UplinkCredentialManager class.
 
@@ -16,6 +16,8 @@ from omegaconf import DictConfig
 from playwright.sync_api import BrowserContext, Page
 from pytest import MonkeyPatch
 from redis import RedisError
+from requests.exceptions import ConnectionError as RequestConnectionError
+from requests.exceptions import HTTPError, Timeout
 
 from app.data_layer.data_models.credential_model import (
     UplinkCredentialInput,
@@ -23,6 +25,7 @@ from app.data_layer.data_models.credential_model import (
 )
 from app.utils.common import init_from_cfg
 from app.utils.credentials import CredentialManager, UplinkCredentialManager
+from app.utils.urls import REDIRECT_URI, UPLINK_ACCESS_TOKEN_URL
 
 KEY = "test_key"
 UPLINK_CRED_INPUT_ENV = {
@@ -32,6 +35,7 @@ UPLINK_CRED_INPUT_ENV = {
     "UPLINK_MOBILE_NO": "1234567890",
     "UPLINK_PIN": "123456",
 }
+AUTH_URL = "https://example.com/auth"
 
 
 @pytest.fixture(autouse=True)
@@ -212,18 +216,23 @@ class TestGetNextExpiryTime:
     Test class for get_next_expiry_time method.
     """
 
+    @pytest.fixture
+    def mock_datetime(self, mocker):
+        """
+        Fixture to mock datetime for testing.
+        """
+        return mocker.patch("app.utils.credentials.uplink_credential_manager.datetime")
+
     def test_get_next_expiry_time_before_3_30pm(
         self,
         uplink_credential_manager: UplinkCredentialManager,
         mock_datetime_before_3_30pm: datetime,
-        mocker,
+        mock_datetime: MagicMock,
     ):
         """
         Test get_next_expiry_time when current time is before 3:30 PM IST.
         """
-        mocker.patch(
-            "app.utils.credentials.uplink_credential_manager.datetime"
-        ).now.return_value = mock_datetime_before_3_30pm
+        mock_datetime.now.return_value = mock_datetime_before_3_30pm
 
         result = uplink_credential_manager.get_next_expiry_time()
 
@@ -241,14 +250,12 @@ class TestGetNextExpiryTime:
         self,
         uplink_credential_manager: UplinkCredentialManager,
         mock_datetime_after_3_30pm: datetime,
-        mocker,
+        mock_datetime,
     ):
         """
         Test get_next_expiry_time when current time is after 3:30 PM IST.
         """
-        mocker.patch(
-            "app.utils.credentials.uplink_credential_manager.datetime"
-        ).now.return_value = mock_datetime_after_3_30pm
+        mock_datetime.now.return_value = mock_datetime_after_3_30pm
 
         result = uplink_credential_manager.get_next_expiry_time()
 
@@ -278,7 +285,7 @@ class TestCheckCache:
         Test check_cache with valid hash data in Redis.
         """
         mock_pipeline = mock_redis_client.pipeline.return_value
-        mock_pipeline.execute.return_value = ["hash", mock_uplink_redis_hash_data]
+        mock_pipeline.execute.return_value = [b"hash", mock_uplink_redis_hash_data]
 
         result = uplink_credential_manager.check_cache(mock_redis_client, KEY)
 
@@ -392,24 +399,28 @@ class TestGetAuthCode:
     Test class for _get_auth_code method.
     """
 
+    @pytest.fixture(autouse=True)
+    def mock_totp(self, mocker, mock_pyotp):
+        """
+        Fixture to mock pyotp TOTP instance.
+        """
+        return mocker.patch(
+            "app.utils.credentials.uplink_credential_manager.pyotp.TOTP",
+            return_value=mock_pyotp,
+        )
+
     def test_get_auth_code_success(
         self,
         uplink_credential_manager: UplinkCredentialManager,
         mock_playwright,
         mock_uplink_credential_input: UplinkCredentialInput,
-        mock_pyotp,
+        mock_totp: MagicMock,
         mocker,
     ):
         """
         Test successful retrieval of authorization code.
         """
-        auth_url = "https://example.com/auth"
         expected_code = "test_auth_code"
-
-        mock_totp = mocker.patch(
-            "app.utils.credentials.uplink_credential_manager.pyotp.TOTP",
-            return_value=mock_pyotp,
-        )
 
         # Mock page interactions
         mock_page = (
@@ -420,13 +431,13 @@ class TestGetAuthCode:
         mock_page.expect_request.return_value.__enter__.return_value = mock_request
 
         result = uplink_credential_manager._get_auth_code(
-            mock_playwright, auth_url, mock_uplink_credential_input
+            mock_playwright, AUTH_URL, mock_uplink_credential_input
         )
 
         assert result == expected_code
 
         # Verify browser automation steps
-        mock_page.goto.assert_called_once_with(auth_url)
+        mock_page.goto.assert_called_once_with(AUTH_URL)
         mock_page.locator.assert_any_call("#mobileNum")
         mock_page.locator.assert_any_call("#otpNum")
         mock_page.get_by_role.assert_any_call("button", name="Get OTP")
@@ -435,7 +446,6 @@ class TestGetAuthCode:
 
         # Verify TOTP generation
         mock_totp.assert_called_once_with(mock_uplink_credential_input.totp_key)
-        mock_pyotp.now.assert_called_once()
 
     def test_get_auth_code_no_code_in_url(
         self,
@@ -447,17 +457,6 @@ class TestGetAuthCode:
         """
         Test _get_auth_code when no code is found in redirect URL.
         """
-        auth_url = "https://example.com/auth"
-
-        # Mock pyotp
-        mock_totp = mocker.MagicMock()
-        mock_totp.now.return_value = "123456"
-        mocker.patch(
-            "app.utils.credentials.uplink_credential_manager.pyotp.TOTP",
-            return_value=mock_totp,
-        )
-
-        # Mock page interactions
         mock_page = (
             mock_playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
         )
@@ -466,10 +465,305 @@ class TestGetAuthCode:
         mock_page.expect_request.return_value.__enter__.return_value = mock_request
 
         result = uplink_credential_manager._get_auth_code(
-            mock_playwright, auth_url, mock_uplink_credential_input
+            mock_playwright, AUTH_URL, mock_uplink_credential_input
         )
 
         assert result is None
+
+    def test_get_auth_code_browser_automation_exception(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+        mocker,
+    ):
+        """
+        Test _get_auth_code when browser automation fails.
+        """
+        # Mock browser launch to raise an exception
+        mock_browser = mocker.MagicMock()
+        mock_context = mocker.MagicMock()
+        mock_browser.new_context.return_value = mock_context
+        mock_playwright.chromium.launch.return_value = mock_browser
+
+        # Mock page creation to raise an exception
+        page_error = Exception("Failed to create page")
+        mock_context.new_page.side_effect = page_error
+
+        with pytest.raises(Exception, match="Failed to create page"):
+            uplink_credential_manager._get_auth_code(
+                mock_playwright, AUTH_URL, mock_uplink_credential_input
+            )
+
+        # Verify error logging
+        mock_logger.error.assert_called_once_with(
+            "Error during browser automation: %s", page_error
+        )
+
+        # Verify cleanup
+        mock_context.close.assert_called_once()
+        mock_browser.close.assert_called_once()
+
+    def test_get_auth_code_totp_generation_error(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+        mock_totp: MagicMock,
+    ):
+        """
+        Test _get_auth_code when TOTP generation fails.
+        """
+        # Mock TOTP to raise an exception
+        totp_error = Exception("Invalid TOTP key")
+        mock_totp.side_effect = totp_error
+
+        with pytest.raises(Exception, match="Invalid TOTP key"):
+            uplink_credential_manager._get_auth_code(
+                mock_playwright, AUTH_URL, mock_uplink_credential_input
+            )
+
+        # Verify error logging
+        mock_logger.error.assert_called_once_with(
+            "Error during browser automation: %s", totp_error
+        )
+
+        # Verify TOTP was called with correct key
+        mock_totp.assert_called_once_with(mock_uplink_credential_input.totp_key)
+
+    def test_get_auth_code_page_interaction_error(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _get_auth_code when page interaction fails.
+        """
+        # Mock page interactions
+        mock_page = (
+            mock_playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
+        )
+
+        # Mock element locator to raise an exception
+        locator_error = Exception("Element not found")
+        mock_page.locator.side_effect = locator_error
+
+        with pytest.raises(Exception, match="Element not found"):
+            uplink_credential_manager._get_auth_code(
+                mock_playwright, AUTH_URL, mock_uplink_credential_input
+            )
+
+        # Verify error logging
+        mock_logger.error.assert_called_once_with(
+            "Error during browser automation: %s", locator_error
+        )
+
+        # Verify page.goto was called before the error
+        mock_page.goto.assert_called_once_with(AUTH_URL)
+
+    def test_get_auth_code_page_loading_error(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _get_auth_code when page fails to load.
+        """
+        # Mock page interactions
+        mock_page = (
+            mock_playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
+        )
+
+        # Mock page.goto to raise an exception
+        navigation_error = Exception("Page failed to load")
+        mock_page.goto.side_effect = navigation_error
+
+        with pytest.raises(Exception, match="Page failed to load"):
+            uplink_credential_manager._get_auth_code(
+                mock_playwright, AUTH_URL, mock_uplink_credential_input
+            )
+
+        # Verify error logging
+        mock_logger.error.assert_called_once_with(
+            "Error during browser automation: %s", navigation_error
+        )
+
+        # Verify page.goto was called with correct URL
+        mock_page.goto.assert_called_once_with(AUTH_URL)
+
+    def test_get_auth_code_malformed_redirect_url(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mocker,
+    ):
+        """
+        Test _get_auth_code with malformed redirect URL.
+        """
+        # Mock page interactions
+        mock_page = (
+            mock_playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
+        )
+        mock_request = mocker.MagicMock()
+        mock_request.value.url = "malformed-url-without-query"  # No query parameters
+        mock_page.expect_request.return_value.__enter__.return_value = mock_request
+
+        result = uplink_credential_manager._get_auth_code(
+            mock_playwright, AUTH_URL, mock_uplink_credential_input
+        )
+
+        assert result is None
+
+    def test_get_auth_code_empty_code_parameter(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mocker,
+    ):
+        """
+        Test _get_auth_code when code parameter exists but is empty.
+        """
+        mock_page = (
+            mock_playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
+        )
+        mock_request = mocker.MagicMock()
+        mock_request.value.url = "https://127.0.0.1:5055/?code="  # Empty code parameter
+        mock_page.expect_request.return_value.__enter__.return_value = mock_request
+
+        result = uplink_credential_manager._get_auth_code(
+            mock_playwright, AUTH_URL, mock_uplink_credential_input
+        )
+
+        assert result is None  # parse_qs ignores blank values by default
+
+    def test_get_auth_code_multiple_code_parameters(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mocker,
+    ):
+        """
+        Test _get_auth_code when URL contains multiple code parameters.
+        """
+        expected_code = "first_code"
+
+        # Mock page interactions
+        mock_page = (
+            mock_playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
+        )
+        mock_request = mocker.MagicMock()
+        mock_request.value.url = (
+            f"https://127.0.0.1:5055/?code={expected_code}&code=second_code"
+        )
+        mock_page.expect_request.return_value.__enter__.return_value = mock_request
+
+        result = uplink_credential_manager._get_auth_code(
+            mock_playwright, AUTH_URL, mock_uplink_credential_input
+        )
+
+        assert result == expected_code  # Should return first code
+
+    def test_get_auth_code_browser_cleanup_on_success(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mocker,
+    ):
+        """
+        Test _get_auth_code ensures proper browser cleanup on success.
+        """
+        expected_code = "test_auth_code"
+
+        # Mock browser and context
+        mock_browser = mock_playwright.chromium.launch.return_value
+        mock_context = mock_browser.new_context.return_value
+        mock_page = mock_context.new_page.return_value
+
+        mock_request = mocker.MagicMock()
+        mock_request.value.url = f"https://127.0.0.1:5055/?code={expected_code}"
+        mock_page.expect_request.return_value.__enter__.return_value = mock_request
+
+        result = uplink_credential_manager._get_auth_code(
+            mock_playwright, AUTH_URL, mock_uplink_credential_input
+        )
+
+        assert result == expected_code
+
+        # Verify browser cleanup
+        mock_context.close.assert_called_once()
+        mock_browser.close.assert_called_once()
+
+    def test_get_auth_code_browser_cleanup_on_exception(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _get_auth_code ensures proper browser cleanup even on exception.
+        """
+        # Mock browser and context
+        mock_browser = mock_playwright.chromium.launch.return_value
+        mock_context = mock_browser.new_context.return_value
+        mock_page = mock_context.new_page.return_value
+
+        # Mock an exception during page interaction
+        page_error = Exception("Page interaction failed")
+        mock_page.goto.side_effect = page_error
+
+        with pytest.raises(Exception, match="Page interaction failed"):
+            uplink_credential_manager._get_auth_code(
+                mock_playwright, AUTH_URL, mock_uplink_credential_input
+            )
+
+        # Verify browser cleanup happened despite exception
+        mock_context.close.assert_called_once()
+        mock_browser.close.assert_called_once()
+
+        # Verify error was logged
+        mock_logger.error.assert_called_once_with(
+            "Error during browser automation: %s", page_error
+        )
+
+    def test_get_auth_code_request_expect_timeout(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_playwright,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+    ):
+        """
+        Test _get_auth_code when request expectation times out.
+        """
+        # Mock page interactions
+        mock_page = (
+            mock_playwright.chromium.launch.return_value.new_context.return_value.new_page.return_value
+        )
+
+        # Mock expect_request to raise a timeout exception
+        timeout_error = Exception("Request expectation timed out")
+        mock_page.expect_request.side_effect = timeout_error
+
+        with pytest.raises(Exception, match="Request expectation timed out"):
+            uplink_credential_manager._get_auth_code(
+                mock_playwright, AUTH_URL, mock_uplink_credential_input
+            )
+
+        # Verify error logging
+        mock_logger.error.assert_called_once_with(
+            "Error during browser automation: %s", timeout_error
+        )
 
 
 class TestGetAccessToken:
@@ -477,11 +771,31 @@ class TestGetAccessToken:
     Test class for get_access_token method.
     """
 
+    @pytest.fixture
+    def headers_payload(self, mock_uplink_credential_input: UplinkCredentialInput):
+        """
+        Fixture to provide headers and payload for access token request.
+        """
+        return (
+            {
+                "accept": "application/json",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            {
+                "code": "test_auth_code",
+                "client_id": mock_uplink_credential_input.api_key,
+                "client_secret": mock_uplink_credential_input.secret_key,
+                "redirect_uri": REDIRECT_URI,
+                "grant_type": "authorization_code",
+            },
+        )
+
     def test_get_access_token_success(
         self,
         uplink_credential_manager: UplinkCredentialManager,
         mock_uplink_credential_input: UplinkCredentialInput,
         mock_requests_response: MagicMock,
+        headers_payload: tuple[dict[str, str], dict[str, str]],
         mocker,
     ):
         """
@@ -489,6 +803,7 @@ class TestGetAccessToken:
         """
         code = "test_auth_code"
         expected_token = "test_access_token"
+        headers, data = headers_payload
 
         mock_post = mocker.patch(
             "app.utils.credentials.uplink_credential_manager.requests.post",
@@ -500,7 +815,6 @@ class TestGetAccessToken:
         )
 
         assert result == expected_token
-        mock_post.assert_called_once()
 
         # Verify request parameters
         call_args = mock_post.call_args
@@ -511,10 +825,18 @@ class TestGetAccessToken:
             == mock_uplink_credential_input.secret_key
         )
 
+        mock_post.assert_called_once_with(
+            UPLINK_ACCESS_TOKEN_URL,
+            headers=headers,
+            data=data,
+            timeout=10,
+        )
+
     def test_get_access_token_failure(
         self,
         uplink_credential_manager: UplinkCredentialManager,
         mock_uplink_credential_input: UplinkCredentialInput,
+        headers_payload: tuple[dict[str, str], dict[str, str]],
         mocker,
     ):
         """
@@ -523,13 +845,15 @@ class TestGetAccessToken:
         code = "test_auth_code"
         error_description = "Invalid authorization code"
 
+        headers, data = headers_payload
+
         mock_response = mocker.MagicMock()
         mock_response.json.return_value = {
             "error": "invalid_grant",
             "error_description": error_description,
         }
 
-        mocker.patch(
+        mock_post = mocker.patch(
             "app.utils.credentials.uplink_credential_manager.requests.post",
             return_value=mock_response,
         )
@@ -540,6 +864,183 @@ class TestGetAccessToken:
             uplink_credential_manager.get_access_token(
                 mock_uplink_credential_input, code
             )
+
+        mock_post.assert_called_once_with(
+            UPLINK_ACCESS_TOKEN_URL,
+            headers=headers,
+            data=data,
+            timeout=10,
+        )
+
+    def test_get_access_token_http_error(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+        mocker,
+    ):
+        """
+        Test get_access_token when HTTP request returns an error status.
+        """
+        code = "test_auth_code"
+
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status.side_effect = HTTPError("401 Unauthorized")
+
+        mock_post = mocker.patch(
+            "app.utils.credentials.uplink_credential_manager.requests.post",
+            return_value=mock_response,
+        )
+
+        with pytest.raises(HTTPError, match="401 Unauthorized"):
+            uplink_credential_manager.get_access_token(
+                mock_uplink_credential_input, code
+            )
+
+        mock_logger.error.assert_called_once_with(
+            "Failed to request access token: %s",
+            mock_response.raise_for_status.side_effect,
+        )
+        mock_post.assert_called_once()
+
+    def test_get_access_token_connection_error(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+        mocker,
+    ):
+        """
+        Test get_access_token when network connection fails.
+        """
+        code = "test_auth_code"
+
+        connection_error = RequestConnectionError("Connection failed")
+        mock_post = mocker.patch(
+            "app.utils.credentials.uplink_credential_manager.requests.post",
+            side_effect=connection_error,
+        )
+
+        with pytest.raises(RequestConnectionError, match="Connection failed"):
+            uplink_credential_manager.get_access_token(
+                mock_uplink_credential_input, code
+            )
+
+        mock_logger.error.assert_called_once_with(
+            "Failed to request access token: %s", connection_error
+        )
+
+        mock_post.assert_called_once()
+
+    def test_get_access_token_timeout_error(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mock_logger: MagicMock,
+        mocker,
+    ):
+        """
+        Test get_access_token when request times out.
+        """
+        code = "test_auth_code"
+
+        timeout_error = Timeout("Request timed out")
+        mock_post = mocker.patch(
+            "app.utils.credentials.uplink_credential_manager.requests.post",
+            side_effect=timeout_error,
+        )
+
+        with pytest.raises(Timeout, match="Request timed out"):
+            uplink_credential_manager.get_access_token(
+                mock_uplink_credential_input, code
+            )
+
+        mock_logger.error.assert_called_once_with(
+            "Failed to request access token: %s", timeout_error
+        )
+        mock_post.assert_called_once()
+
+    def test_get_access_token_invalid_json_response(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mocker,
+    ):
+        """
+        Test get_access_token when API returns invalid JSON.
+        """
+        code = "test_auth_code"
+
+        mock_response = mocker.MagicMock()
+        mock_response.json.side_effect = ValueError("Invalid JSON")
+
+        mock_post = mocker.patch(
+            "app.utils.credentials.uplink_credential_manager.requests.post",
+            return_value=mock_response,
+        )
+
+        with pytest.raises(ValueError, match="Invalid JSON"):
+            uplink_credential_manager.get_access_token(
+                mock_uplink_credential_input, code
+            )
+        mock_post.assert_called_once()
+
+        # Note: logger.error won't be called in this case because ValueError from json()
+        # is not caught by the requests.exceptions.RequestException handler
+
+    def test_get_access_token_empty_access_token(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mocker,
+    ):
+        """
+        Test get_access_token when API returns empty access token.
+        """
+        code = "test_auth_code"
+
+        mock_response = mocker.MagicMock()
+        mock_response.json.return_value = {"access_token": ""}
+
+        mock_post = mocker.patch(
+            "app.utils.credentials.uplink_credential_manager.requests.post",
+            return_value=mock_response,
+        )
+
+        with pytest.raises(
+            ValueError, match="Failed to get access token: Unknown error"
+        ):
+            uplink_credential_manager.get_access_token(
+                mock_uplink_credential_input, code
+            )
+        mock_post.assert_called_once()
+
+    def test_get_access_token_no_access_token_field(
+        self,
+        uplink_credential_manager: UplinkCredentialManager,
+        mock_uplink_credential_input: UplinkCredentialInput,
+        mocker,
+    ):
+        """
+        Test get_access_token when API response has no access_token field.
+        """
+        code = "test_auth_code"
+
+        mock_response = mocker.MagicMock()
+        mock_response.json.return_value = {"some_other_field": "value"}
+
+        mock_post = mocker.patch(
+            "app.utils.credentials.uplink_credential_manager.requests.post",
+            return_value=mock_response,
+        )
+
+        with pytest.raises(
+            ValueError, match="Failed to get access token: Unknown error"
+        ):
+            uplink_credential_manager.get_access_token(
+                mock_uplink_credential_input, code
+            )
+        mock_post.assert_called_once()
 
 
 class TestGenerateNewCredentials:

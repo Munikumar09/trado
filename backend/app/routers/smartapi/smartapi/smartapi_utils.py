@@ -7,6 +7,7 @@ abstractions.
 """
 
 import http.client
+import json
 from http.client import HTTPConnection
 
 from omegaconf import DictConfig
@@ -42,6 +43,7 @@ def get_endpoint_connection(
     )
     connection = http.client.HTTPSConnection("apiconnect.angelbroking.com")
     headers = smartapi_credential_manager.get_headers()
-    connection.request(request_method_type.value, url, body=payload, headers=headers)
+    body = json.dumps(payload) if isinstance(payload, dict) else payload
+    connection.request(request_method_type.value, url, body=body, headers=headers)
 
     return connection

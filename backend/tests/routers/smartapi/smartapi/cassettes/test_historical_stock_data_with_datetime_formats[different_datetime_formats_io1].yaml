@@ -1,0 +1,87 @@
+interactions:
+- request:
+    body: '{"exchange": "NSE", "tradingsymbol": "TCS", "interval": "ONE_MINUTE", "fromdate":
+      "2023-10-09 15:15", "todate": "2023-10-09 16:29", "symboltoken": "11536"}'
+    headers:
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      X-ClientLocalIP:
+      - CLIENT_LOCAL_IP
+      X-ClientPublicIP:
+      - CLIENT_PUBLIC_IP
+      X-MACAddress:
+      - MAC_ADDRESS
+      X-PrivateKey:
+      - zQi2vgME
+      X-SourceID:
+      - WEB
+      X-UserType:
+      - USER
+    method: POST
+    uri: https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData
+  response:
+    body:
+      string: '{"status":true,"message":"SUCCESS","errorcode":"","data":[["2023-10-09T15:15:00+05:30",3640.0,3641.0,3640.0,3640.85,12267],["2023-10-09T15:16:00+05:30",3640.9,3640.9,3640.0,3640.6,13679],["2023-10-09T15:17:00+05:30",3640.55,3641.0,3639.85,3640.0,12213],["2023-10-09T15:18:00+05:30",3640.0,3640.0,3636.4,3636.55,19918],["2023-10-09T15:19:00+05:30",3636.55,3636.55,3635.05,3635.05,14069],["2023-10-09T15:20:00+05:30",3635.45,3635.95,3632.15,3632.2,38008],["2023-10-09T15:21:00+05:30",3633.7,3636.0,3632.2,3632.2,12430],["2023-10-09T15:22:00+05:30",3632.15,3632.8,3631.0,3632.25,13777],["2023-10-09T15:23:00+05:30",3632.25,3633.0,3632.0,3632.8,10226],["2023-10-09T15:24:00+05:30",3632.8,3633.55,3632.05,3632.9,13050],["2023-10-09T15:25:00+05:30",3632.9,3633.0,3632.1,3632.6,10322],["2023-10-09T15:26:00+05:30",3632.6,3633.85,3632.0,3633.0,14194],["2023-10-09T15:27:00+05:30",3632.95,3633.6,3632.5,3632.65,13389],["2023-10-09T15:28:00+05:30",3632.55,3634.9,3631.2,3631.8,16925],["2023-10-09T15:29:00+05:30",3631.45,3633.3,3631.0,3633.0,10369]]}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'false'
+      Access-Control-Allow-Headers:
+      - Content-type,X-Requested-With,Origin,accept,Authorization,X-SourceID,X-ClientLocalIP,X-ClientPublicIP,X-MACaddress,X-PrivateKey,X-UserType,Access-Control-Allow-Origin
+      Access-Control-Allow-Methods:
+      - POST, GET, OPTIONS
+      Access-Control-Max-Age:
+      - '3600'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '1040'
+      Content-Security-Policy:
+      - default-src 'self'; frame-ancestors 'self' https://*.angelbroking.com; https://*.angelone.in;
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 30 Jul 2025 03:32:48 GMT
+      Referrer-Policy:
+      - strict-origin
+      Set-Cookie: '[REDACTED]'
+      Strict-Transport-Security:
+      - max-age=31536000
+      - max-age=31536000
+      Vary:
+      - Accept-Encoding
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+    status:
+      code: 200
+      message: ''
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - testserver
+      user-agent:
+      - testclient
+    method: GET
+    uri: http://testserver/smart-api/equity/history/tcs?end_date=2023-OCT-9+16%3A29&interval=ONE_MINUTE&start_date=2023%2Foctober%2F9+15%3A15
+  response:
+    body:
+      string: '{"available_stock_data":[{"timestamp":"2023-10-09T15:15:00+05:30","open":3640.0,"high":3640.85,"low":3640.0,"close":3641.0,"volume":12267,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:16:00+05:30","open":3640.9,"high":3640.6,"low":3640.0,"close":3640.9,"volume":13679,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:17:00+05:30","open":3640.55,"high":3640.0,"low":3639.85,"close":3641.0,"volume":12213,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:18:00+05:30","open":3640.0,"high":3636.55,"low":3636.4,"close":3640.0,"volume":19918,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:19:00+05:30","open":3636.55,"high":3635.05,"low":3635.05,"close":3636.55,"volume":14069,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:20:00+05:30","open":3635.45,"high":3632.2,"low":3632.15,"close":3635.95,"volume":38008,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:21:00+05:30","open":3633.7,"high":3632.2,"low":3632.2,"close":3636.0,"volume":12430,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:22:00+05:30","open":3632.15,"high":3632.25,"low":3631.0,"close":3632.8,"volume":13777,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:23:00+05:30","open":3632.25,"high":3632.8,"low":3632.0,"close":3633.0,"volume":10226,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:24:00+05:30","open":3632.8,"high":3632.9,"low":3632.05,"close":3633.55,"volume":13050,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:25:00+05:30","open":3632.9,"high":3632.6,"low":3632.1,"close":3633.0,"volume":10322,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:26:00+05:30","open":3632.6,"high":3633.0,"low":3632.0,"close":3633.85,"volume":14194,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:27:00+05:30","open":3632.95,"high":3632.65,"low":3632.5,"close":3633.6,"volume":13389,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:28:00+05:30","open":3632.55,"high":3631.8,"low":3631.2,"close":3634.9,"volume":16925,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:29:00+05:30","open":3631.45,"high":3633.0,"low":3631.0,"close":3633.3,"volume":10369,"stock_symbol":"TCS","candle_interval":"ONE_MINUTE"}],"missing_timestamps":[]}'
+    headers:
+      content-length:
+      - '2546'
+      content-type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1
