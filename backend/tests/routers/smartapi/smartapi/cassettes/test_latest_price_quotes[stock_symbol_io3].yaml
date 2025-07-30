@@ -1,0 +1,28 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - testserver
+      user-agent:
+      - testclient
+    method: GET
+    uri: http://testserver/smart-api/equity/price/
+  response:
+    body:
+      string: Not Found
+    headers:
+      content-length:
+      - '9'
+      content-type:
+      - text/plain; charset=utf-8
+    status:
+      code: 404
+      message: Not Found
+version: 1

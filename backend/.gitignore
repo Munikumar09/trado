@@ -10,3 +10,4 @@ __pycache__
 postgres_data
 pgadmin_data
 kafka1_data
+.mypy_cache

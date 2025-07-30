@@ -1,0 +1,86 @@
+interactions:
+- request:
+    body: '{"exchange": "NSE", "tradingsymbol": "SBIN", "interval": "ONE_MINUTE",
+      "fromdate": "2023-10-09 15:15", "todate": "2023-10-09 16:29", "symboltoken":
+      "3045"}'
+    headers:
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      X-ClientLocalIP:
+      - CLIENT_LOCAL_IP
+      X-ClientPublicIP:
+      - CLIENT_PUBLIC_IP
+      X-MACAddress:
+      - MAC_ADDRESS
+      X-PrivateKey:
+      - zQi2vgME
+      X-SourceID:
+      - WEB
+      X-UserType:
+      - USER
+    method: POST
+    uri: https://apiconnect.angelbroking.com/rest/secure/angelbroking/historical/v1/getCandleData
+  response:
+    body:
+      string: '{"status":true,"message":"SUCCESS","errorcode":"","data":[["2023-10-09T15:15:00+05:30",585.2,585.25,584.9,585.1,39717],["2023-10-09T15:16:00+05:30",585.1,585.2,585.0,585.05,57305],["2023-10-09T15:17:00+05:30",585.1,585.5,585.05,585.2,47234],["2023-10-09T15:18:00+05:30",585.2,585.4,584.75,584.85,59861],["2023-10-09T15:19:00+05:30",584.8,584.9,584.65,584.85,33024],["2023-10-09T15:20:00+05:30",584.85,585.15,584.7,584.95,93018],["2023-10-09T15:21:00+05:30",584.8,585.2,584.8,585.1,19607],["2023-10-09T15:22:00+05:30",585.15,585.25,585.0,585.05,31449],["2023-10-09T15:23:00+05:30",585.1,585.1,584.95,585.0,39026],["2023-10-09T15:24:00+05:30",584.95,585.05,584.75,585.0,31045],["2023-10-09T15:25:00+05:30",584.95,585.0,584.75,584.8,36731],["2023-10-09T15:26:00+05:30",584.8,584.95,584.5,584.8,28299],["2023-10-09T15:27:00+05:30",584.65,584.9,584.65,584.75,31928],["2023-10-09T15:28:00+05:30",584.9,584.9,584.6,584.7,40052],["2023-10-09T15:29:00+05:30",584.7,584.8,584.5,584.55,48190]]}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'false'
+      Access-Control-Allow-Headers:
+      - Content-type,X-Requested-With,Origin,accept,Authorization,X-SourceID,X-ClientLocalIP,X-ClientPublicIP,X-MACaddress,X-PrivateKey,X-UserType,Access-Control-Allow-Origin
+      Access-Control-Allow-Methods:
+      - POST, GET, OPTIONS
+      Access-Control-Max-Age:
+      - '3600'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '983'
+      Content-Security-Policy:
+      - default-src 'self'; frame-ancestors 'self' https://*.angelbroking.com; https://*.angelone.in;
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 30 Jul 2025 03:32:50 GMT
+      Referrer-Policy:
+      - strict-origin
+      Set-Cookie: '[REDACTED]'
+      Strict-Transport-Security:
+      - max-age=31536000
+      - max-age=31536000
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+    status:
+      code: 200
+      message: ''
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - testserver
+      user-agent:
+      - testclient
+    method: GET
+    uri: http://testserver/smart-api/equity/history/SBIN?end_date=2023-OCT-9+16%3A29&interval=ONE_MINUTE&start_date=2023%2F10%2F9+15%3A15
+  response:
+    body:
+      string: '{"available_stock_data":[{"timestamp":"2023-10-09T15:15:00+05:30","open":585.2,"high":585.1,"low":584.9,"close":585.25,"volume":39717,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:16:00+05:30","open":585.1,"high":585.05,"low":585.0,"close":585.2,"volume":57305,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:17:00+05:30","open":585.1,"high":585.2,"low":585.05,"close":585.5,"volume":47234,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:18:00+05:30","open":585.2,"high":584.85,"low":584.75,"close":585.4,"volume":59861,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:19:00+05:30","open":584.8,"high":584.85,"low":584.65,"close":584.9,"volume":33024,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:20:00+05:30","open":584.85,"high":584.95,"low":584.7,"close":585.15,"volume":93018,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:21:00+05:30","open":584.8,"high":585.1,"low":584.8,"close":585.2,"volume":19607,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:22:00+05:30","open":585.15,"high":585.05,"low":585.0,"close":585.25,"volume":31449,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:23:00+05:30","open":585.1,"high":585.0,"low":584.95,"close":585.1,"volume":39026,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:24:00+05:30","open":584.95,"high":585.0,"low":584.75,"close":585.05,"volume":31045,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:25:00+05:30","open":584.95,"high":584.8,"low":584.75,"close":585.0,"volume":36731,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:26:00+05:30","open":584.8,"high":584.8,"low":584.5,"close":584.95,"volume":28299,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:27:00+05:30","open":584.65,"high":584.75,"low":584.65,"close":584.9,"volume":31928,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:28:00+05:30","open":584.9,"high":584.7,"low":584.6,"close":584.9,"volume":40052,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"},{"timestamp":"2023-10-09T15:29:00+05:30","open":584.7,"high":584.55,"low":584.5,"close":584.8,"volume":48190,"stock_symbol":"SBIN","candle_interval":"ONE_MINUTE"}],"missing_timestamps":[]}'
+    headers:
+      content-length:
+      - '2504'
+      content-type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

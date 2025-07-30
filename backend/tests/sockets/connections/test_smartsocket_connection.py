@@ -103,7 +103,7 @@ def test_init_from_cfg_valid_cfg(
     assert connection is not None
     assert isinstance(connection, SmartSocketConnection)
     smart_socket_mock.initialize_socket.assert_called_once_with(
-        cfg.provider, mock_producer.return_value
+        cfg.provider, 0, mock_producer.return_value
     )
     assert smart_socket_mock.mock_calls[1] == call.initialize_socket().set_tokens(
         [{"exchangeType": 1, "tokens": expected_tokens}]

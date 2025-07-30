@@ -1,0 +1,84 @@
+interactions:
+- request:
+    body: '{"exchange": "NSE", "tradingsymbol": "INFY", "symboltoken": "1594"}'
+    headers:
+      Accept:
+      - application/json
+      Content-Type:
+      - application/json
+      X-ClientLocalIP:
+      - CLIENT_LOCAL_IP
+      X-ClientPublicIP:
+      - CLIENT_PUBLIC_IP
+      X-MACAddress:
+      - MAC_ADDRESS
+      X-PrivateKey:
+      - zQi2vgME
+      X-SourceID:
+      - WEB
+      X-UserType:
+      - USER
+    method: POST
+    uri: https://apiconnect.angelbroking.com/rest/secure/angelbroking/order/v1/getLtpData
+  response:
+    body:
+      string: '{"status":true,"message":"SUCCESS","errorcode":"","data":{"exchange":"NSE","tradingsymbol":"INFY-EQ","symboltoken":"1594","open":1513.0,"high":1517.2,"low":1496.1,"close":1516.0,"ltp":1513.7}}'
+    headers:
+      Access-Control-Allow-Credentials:
+      - 'false'
+      Access-Control-Allow-Headers:
+      - Content-type,X-Requested-With,Origin,accept,Authorization,X-SourceID,X-ClientLocalIP,X-ClientPublicIP,X-MACaddress,X-PrivateKey,X-UserType,x-forwarded-for,X-Forwarded-For,Access-Control-Allow-Origin
+      Access-Control-Allow-Methods:
+      - POST, GET, OPTIONS
+      Access-Control-Max-Age:
+      - '3600'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '192'
+      Content-Security-Policy:
+      - default-src 'self'; frame-ancestors 'self' https://*.angelbroking.com; https://*.angelone.in;
+      Content-Type:
+      - application/json
+      Date:
+      - Wed, 30 Jul 2025 03:32:42 GMT
+      Referrer-Policy:
+      - strict-origin
+      Set-Cookie: '[REDACTED]'
+      Strict-Transport-Security:
+      - max-age=31536000
+      - max-age=31536000
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+    status:
+      code: 200
+      message: ''
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - testserver
+      user-agent:
+      - testclient
+    method: GET
+    uri: http://testserver/smart-api/equity/price/infy
+  response:
+    body:
+      string: '{"symbol":"INFY-EQ","last_traded_price":1513.7,"day_open":1513.0,"day_low":1496.1,"day_high":1517.2,"change":-2.2999999999999545,"percent_change":-0.15171503957783342,"symbol_token":"1594","prev_day_close":1516.0}'
+    headers:
+      content-length:
+      - '213'
+      content-type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

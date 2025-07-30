@@ -3,11 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Query
 
+from app.routers.smartapi.smartapi.smartapi_utils import get_endpoint_connection
 from app.schemas.stock_model import HistoricalStockDataBundle, SmartAPIStockPriceInfo
 from app.utils.common.exceptions.historical_data import UnkownException
 from app.utils.common.types.financial_types import ExchangeType
 from app.utils.common.types.reques_types import CandlestickInterval, RequestType
-from app.utils.smartapi.connection import get_endpoint_connection
 from app.utils.smartapi.data_processor import (
     process_smart_api_historical_stock_data,
     process_smart_api_stock_data,
