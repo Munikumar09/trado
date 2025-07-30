@@ -5,6 +5,7 @@ connections to the websockets based on the configuration.
 
 import time
 from pathlib import Path
+from threading import Thread
 from typing import cast
 
 import hydra
@@ -32,20 +33,35 @@ def create_websocket_connection(cfg: DictConfig):
     """
     num_connections = cfg.connection.num_connections
     pre_connection_number = cfg.connection.current_connection_number
+    connections = []
 
     for i in range(num_connections):
         logger.info("Creating connection instance %s", i)
-        cfg.connection.current_connection_number = pre_connection_number + i
+
+        local_cfg = (
+            cfg.connection.copy()
+            if hasattr(cfg.connection, "copy")
+            else cfg.connection.__class__(cfg.connection)
+        )
+        local_cfg.current_connection_number = pre_connection_number + i
 
         websocket_connection: WebsocketConnection | None = cast(
             None | WebsocketConnection,
-            init_from_cfg(cfg.connection, WebsocketConnection),
+            init_from_cfg(local_cfg, WebsocketConnection),
         )
 
         if websocket_connection:
-            websocket_connection.websocket.connect(True)
+            connection = Thread(
+                target=websocket_connection.websocket.connect,
+                args=(cfg.connection.use_thread,),
+                name=f"WebSocketConnection-{i}",
+            )
+            connection.start()
+            connections.append(connection)
 
-        time.sleep(0.1)
+        time.sleep(1)
+
+    return connections
 
 
 @hydra.main(config_path="../configs", config_name="websocket", version_base=None)
@@ -56,9 +72,15 @@ def main(cfg: DictConfig):
     For example, if there are 2 websockets and 3 connection to each websocket,
     then it will create 6 connections in total.
     """
+    total_connections = []
     create_tokens_db()
+
     for connection in cfg.connections:
-        create_websocket_connection(connection)
+        connections = create_websocket_connection(connection)
+        total_connections.extend(connections)
+
+    for connection in total_connections:
+        connection.join()
 
 
 if __name__ == "__main__":
