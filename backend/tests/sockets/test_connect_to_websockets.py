@@ -519,7 +519,7 @@ class TestModuleIntegration:
         """
         # Setup configuration
 
-        single_connection_cfg.connections[0].connection.num_connections = 1
+        single_connection_cfg.connections[0].connection.num_connections = 2
 
         main(single_connection_cfg)
 
