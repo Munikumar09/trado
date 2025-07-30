@@ -40,7 +40,7 @@ class CredentialManager[CI: CredentialInput, CO: CredentialOutput](Registrable, 
 
         Parameters:
         -----------
-        config: ``dict``
+        config: ``DictConfig``
             The configuration dictionary containing the credentials
 
         Returns:
