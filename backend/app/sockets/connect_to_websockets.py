@@ -4,6 +4,7 @@ connections to the websockets based on the configuration.
 """
 
 import time
+from copy import deepcopy
 from pathlib import Path
 from threading import Thread
 from typing import cast
@@ -38,11 +39,7 @@ def create_websocket_connection(cfg: DictConfig):
     for i in range(num_connections):
         logger.info("Creating connection instance %s", i)
 
-        local_cfg = (
-            cfg.connection.copy()
-            if hasattr(cfg.connection, "copy")
-            else cfg.connection.__class__(cfg.connection)
-        )
+        local_cfg = deepcopy(cfg)
         local_cfg.current_connection_number = pre_connection_number + i
 
         websocket_connection: WebsocketConnection | None = cast(
@@ -56,8 +53,11 @@ def create_websocket_connection(cfg: DictConfig):
                 args=(cfg.connection.use_thread,),
                 name=f"WebSocketConnection-{i}",
             )
-            connection.start()
-            connections.append(connection)
+            try:
+                connection.start()
+                connections.append(connection)
+            except Exception as e:
+                logger.error("Failed to start connection thread %s: %s", i, e)
 
         time.sleep(1)
 

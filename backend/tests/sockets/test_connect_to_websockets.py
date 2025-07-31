@@ -141,20 +141,6 @@ class TestCreateWebsocketConnection:
         }
         return OmegaConf.create(config_dict)
 
-    @pytest.fixture
-    def mock_connection_config(self) -> MagicMock:
-        """
-        Mock connection configuration fixture.
-        """
-        mock_connection_config = MagicMock()
-        mock_connection_config.num_connections = 3
-        mock_connection_config.current_connection_number = 10
-        mock_connection_config.use_thread = True
-        mock_connection_config.name = "test_connection"
-        mock_connection_config.copy = MagicMock(return_value=mock_connection_config)
-
-        return mock_connection_config
-
     def test_create_websocket_connection_success(
         self,
         mock_sleep: MagicMock,
@@ -200,25 +186,6 @@ class TestCreateWebsocketConnection:
         mock_logger.info.assert_any_call("Creating connection instance %s", 0)
         mock_logger.info.assert_any_call("Creating connection instance %s", 1)
 
-    def test_create_websocket_connection_with_copy_method(self, mock_connection_config):
-        """
-        Test connection creation when configuration has copy method.
-        """
-        # Create a direct mock object with copy method rather than using OmegaConf
-        mock_connection_config.num_connections = 1
-        mock_connection_config.current_connection_number = 5
-        mock_connection_config.use_thread = False
-
-        # Create a mock cfg object
-        mock_cfg = MagicMock()
-        mock_cfg.connection = mock_connection_config
-
-        result = create_websocket_connection(mock_cfg)
-
-        assert len(result) == 1
-        mock_connection_config.copy.assert_called_once()
-        assert mock_connection_config.current_connection_number == 5
-
     def test_create_websocket_connection_without_copy_method(
         self, mock_init_from_cfg: MagicMock, minimal_cfg: DictConfig
     ):
@@ -230,6 +197,7 @@ class TestCreateWebsocketConnection:
 
         result = create_websocket_connection(minimal_cfg)
 
+        assert id(minimal_cfg) != id(mock_init_from_cfg.call_args[0])
         assert len(result) == 1
 
         # Verify that current_connection_number is correctly set
@@ -272,22 +240,6 @@ class TestCreateWebsocketConnection:
         assert mock_init_from_cfg.call_count == 0
         assert mock_thread.call_count == 0
         assert mock_sleep.call_count == 0
-
-    def test_create_websocket_connection_increments_connection_number(
-        self, mock_init_from_cfg: MagicMock, mock_connection_config
-    ):
-        """
-        Test that connection numbers are correctly incremented for each connection.
-        """
-        # Create a mock cfg object
-        mock_cfg = MagicMock()
-        mock_cfg.connection = mock_connection_config
-
-        result = create_websocket_connection(mock_cfg)
-
-        assert len(result) == 3
-        assert mock_init_from_cfg.call_count == 3
-        assert mock_connection_config.copy.call_count == 3
 
     def test_create_websocket_connection_exception_in_init_from_cfg(
         self,
