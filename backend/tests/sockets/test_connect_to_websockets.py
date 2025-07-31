@@ -5,12 +5,10 @@ thread management, configuration handling, and error scenarios.
 
 Test Coverage:
 - Connection creation with varying numbers of connections (0, 1, multiple)
-- Configuration handling (with and without copy method)
 - Thread creation and management
 - Error handling (init_from_cfg failures, mixed success/failure scenarios)
 - Main function workflow with single and multiple connections
 - Integration testing for end-to-end flow
-- Edge cases and boundary conditions
 """
 
 from threading import Thread
@@ -197,7 +195,10 @@ class TestCreateWebsocketConnection:
 
         result = create_websocket_connection(minimal_cfg)
 
-        assert id(minimal_cfg) != id(mock_init_from_cfg.call_args[0])
+        called_cfg = mock_init_from_cfg.call_args[0][0]
+        assert called_cfg.current_connection_number == 3
+        assert id(called_cfg) != id(minimal_cfg)
+
         assert len(result) == 1
 
         # Verify that current_connection_number is correctly set
@@ -262,6 +263,7 @@ class TestCreateWebsocketConnection:
         mock_init_from_cfg: MagicMock,
         mock_websocket_connection: MagicMock,
         minimal_cfg: DictConfig,
+        mock_logger: MagicMock,
     ):
         """
         Test behavior when some connections succeed and others fail.
@@ -285,6 +287,10 @@ class TestCreateWebsocketConnection:
         assert mock_thread.call_count == 2
         assert mock_thread.return_value.start.call_count == 2
         assert mock_sleep.call_count == 3  # Sleep called after each iteration
+
+        mock_logger.error.assert_called_once_with(
+            "Failed to create WebsocketConnection instance for connection %s", 1
+        )
 
 
 class TestMain:

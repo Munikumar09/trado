@@ -20,7 +20,7 @@ from app.utils.startup_utils import create_tokens_db
 logger = get_logger(Path(__file__).name)
 
 
-def create_websocket_connection(cfg: DictConfig):
+def create_websocket_connection(cfg: DictConfig) -> list[Thread]:
     """
     Creates the multiple websocket connections based on the `num_connections` parameter
     in the configuration. Once the connections are created, it connects to the websocket.
@@ -31,10 +31,15 @@ def create_websocket_connection(cfg: DictConfig):
     ----------
     cfg: ``DictConfig``
         The configuration for the websocket connection
+
+    Returns
+    -------
+    connections: ``list[Thread]``
+        The list of threads created for the websocket connections.
     """
     num_connections = cfg.connection.num_connections
     pre_connection_number = cfg.connection.current_connection_number
-    connections = []
+    connections: list[Thread] = []
 
     for i in range(num_connections):
         logger.info("Creating connection instance %s", i)
@@ -50,7 +55,7 @@ def create_websocket_connection(cfg: DictConfig):
         if websocket_connection:
             connection = Thread(
                 target=websocket_connection.websocket.connect,
-                args=(cfg.connection.use_thread,),
+                args=(local_cfg.connection.use_thread,),
                 name=f"WebSocketConnection-{i}",
             )
             try:
@@ -58,6 +63,10 @@ def create_websocket_connection(cfg: DictConfig):
                 connections.append(connection)
             except Exception as e:
                 logger.error("Failed to start connection thread %s: %s", i, e)
+        else:
+            logger.error(
+                "Failed to create WebsocketConnection instance for connection %s", i
+            )
 
         time.sleep(1)
 
@@ -72,7 +81,7 @@ def main(cfg: DictConfig):
     For example, if there are 2 websockets and 3 connection to each websocket,
     then it will create 6 connections in total.
     """
-    total_connections = []
+    total_connections: list[Thread] = []
     create_tokens_db()
 
     for connection in cfg.connections:
