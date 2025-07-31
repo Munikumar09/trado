@@ -4,7 +4,9 @@ connections to the websockets based on the configuration.
 """
 
 import time
+from copy import deepcopy
 from pathlib import Path
+from threading import Thread
 from typing import cast
 
 import hydra
@@ -18,7 +20,7 @@ from app.utils.startup_utils import create_tokens_db
 logger = get_logger(Path(__file__).name)
 
 
-def create_websocket_connection(cfg: DictConfig):
+def create_websocket_connection(cfg: DictConfig) -> list[Thread]:
     """
     Creates the multiple websocket connections based on the `num_connections` parameter
     in the configuration. Once the connections are created, it connects to the websocket.
@@ -29,23 +31,46 @@ def create_websocket_connection(cfg: DictConfig):
     ----------
     cfg: ``DictConfig``
         The configuration for the websocket connection
+
+    Returns
+    -------
+    connections: ``list[Thread]``
+        The list of threads created for the websocket connections.
     """
     num_connections = cfg.connection.num_connections
     pre_connection_number = cfg.connection.current_connection_number
+    connections: list[Thread] = []
 
     for i in range(num_connections):
         logger.info("Creating connection instance %s", i)
-        cfg.connection.current_connection_number = pre_connection_number + i
+
+        local_cfg = deepcopy(cfg)
+        local_cfg.current_connection_number = pre_connection_number + i
 
         websocket_connection: WebsocketConnection | None = cast(
             None | WebsocketConnection,
-            init_from_cfg(cfg.connection, WebsocketConnection),
+            init_from_cfg(local_cfg, WebsocketConnection),
         )
 
         if websocket_connection:
-            websocket_connection.websocket.connect(True)
+            connection = Thread(
+                target=websocket_connection.websocket.connect,
+                args=(local_cfg.connection.use_thread,),
+                name=f"WebSocketConnection-{i}",
+            )
+            try:
+                connection.start()
+                connections.append(connection)
+            except Exception as e:
+                logger.error("Failed to start connection thread %s: %s", i, e)
+        else:
+            logger.error(
+                "Failed to create WebsocketConnection instance for connection %s", i
+            )
 
-        time.sleep(0.1)
+        time.sleep(1)
+
+    return connections
 
 
 @hydra.main(config_path="../configs", config_name="websocket", version_base=None)
@@ -56,9 +81,15 @@ def main(cfg: DictConfig):
     For example, if there are 2 websockets and 3 connection to each websocket,
     then it will create 6 connections in total.
     """
+    total_connections: list[Thread] = []
     create_tokens_db()
+
     for connection in cfg.connections:
-        create_websocket_connection(connection)
+        connections = create_websocket_connection(connection)
+        total_connections.extend(connections)
+
+    for connection in total_connections:
+        connection.join()
 
 
 if __name__ == "__main__":

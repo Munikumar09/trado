@@ -15,7 +15,7 @@ symbols: null # List of stock symbols
 num_connections: 3
 exchange_type: NSE
 current_connection_number: 0
-use_thread: true
+use_thread: false
 num_tokens_per_instance: 1000
 
 ################################ NOTE ################################

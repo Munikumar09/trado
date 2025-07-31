@@ -155,7 +155,7 @@ def test_connect(
     websocket_instance.connect(threaded=False)
     mock_connect_ws.assert_called_once()
     assert websocket_instance.websocket_thread is None
-    mock_reactor.run.assert_called_once_with()
+    mock_reactor.run.assert_called_once_with(installSignalHandlers=False)
     mock_connect_ws.reset_mock()
 
     # Test: 3.2 ( Threaded connection )

@@ -285,7 +285,7 @@ class TestCheckCache:
         Test check_cache with valid hash data in Redis.
         """
         mock_pipeline = mock_redis_client.pipeline.return_value
-        mock_pipeline.execute.return_value = [b"hash", mock_uplink_redis_hash_data]
+        mock_pipeline.execute.return_value = ["hash", mock_uplink_redis_hash_data]
 
         result = uplink_credential_manager.check_cache(mock_redis_client, KEY)
 

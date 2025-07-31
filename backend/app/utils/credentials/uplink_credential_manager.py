@@ -89,7 +89,7 @@ class UplinkCredentialManager(
             results = pipe.execute()
             key_type, value = results
 
-            if key_type == b"hash" and value:
+            if key_type == "hash" and value:
                 return UplinkCredentialOutput(**value)
 
             return None

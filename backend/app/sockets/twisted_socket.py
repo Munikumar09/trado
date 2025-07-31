@@ -151,6 +151,9 @@ class MarketDataTwistedSocket(ABC):
 
         opts = {}
         if not reactor.running:
+            opts["installSignalHandlers"] = (
+                threading.current_thread() == threading.main_thread()
+            )
             if threaded:
                 opts["installSignalHandlers"] = False
                 self.websocket_thread = threading.Thread(
