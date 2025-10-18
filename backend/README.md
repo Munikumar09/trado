@@ -1,11 +1,11 @@
 # trado
 
-create conda enviroment with the following command:  
+create conda environment with the following command:  
 `conda env create --name app -f environment.yml`
 
 If poetry not available install poetry:  
 `curl -sSL https://install.python-poetry.org | python3 - --version 1.8.2 -y`  
-Refer the (Digital Ocean)[https://www.digitalocean.com/community/tutorials/how-to-install-poetry-to-manage-python-dependencies-on-ubuntu-22-04]
+Refer the [Digital Ocean](https://www.digitalocean.com/community/tutorials/how-to-install-poetry-to-manage-python-dependencies-on-ubuntu-22-04)
 
 Install required pacakages from poetry with the following command:  
 `poetry install`
