@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-from omegaconf import DictConfig
 from registrable import Registrable
 
 from app.data_layer.data_models.credential_model import (
@@ -31,21 +30,3 @@ class CredentialManager[CI: CredentialInput, CO: CredentialOutput](Registrable, 
             If the method is not implemented in the subclass
         """
         raise NotImplementedError("generate_credentials method not implemented")
-
-    @classmethod
-    @abstractmethod
-    def from_cfg(cls, cfg: DictConfig) -> "CredentialManager":
-        """
-        Create a CredentialManager object from a configuration dictionary.
-
-        Parameters:
-        -----------
-        config: ``DictConfig``
-            The configuration dictionary containing the credentials
-
-        Returns:
-        --------
-        ``CredentialManager``
-            The CredentialManager object with the credentials
-        """
-        raise NotImplementedError("from_cfg method not implemented")

@@ -8,6 +8,10 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from snowflake import SnowflakeGenerator
 
+from app.core.config import settings
+from app.data_layer.data_models.notification_provider_model import (
+    EmailNotificationPayload,
+)
 from app.data_layer.database.crud.user_crud import (
     create_or_update_user_verification,
     create_user,
@@ -23,9 +27,6 @@ from app.utils.common.exceptions.authentication import UserSignupError
 from app.utils.constants import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     EMAIL,
-    JWT_REFRESH_SECRET,
-    JWT_SECRET,
-    MACHINE_ID,
     REFRESH_TOKEN_EXPIRE_MINUTES,
     USER_ID,
 )
@@ -39,7 +40,7 @@ from .user_validation import (
     verify_password,
 )
 
-snowflake_generator = SnowflakeGenerator(MACHINE_ID)
+snowflake_generator = SnowflakeGenerator(settings.jwt_config.machine_id)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/authentication/signin")
 
@@ -186,12 +187,12 @@ def signin_user(email: str, password: str) -> dict[str, str]:
     token_data = {USER_ID: user.user_id, EMAIL: user.email}
     access_token = create_token(
         token_data,
-        JWT_SECRET,
+        settings.jwt_config.secret_key,
         ACCESS_TOKEN_EXPIRE_MINUTES,
     )
     refresh_token = create_token(
         token_data,
-        JWT_REFRESH_SECRET,
+        settings.jwt_config.refresh_secret_key,
         REFRESH_TOKEN_EXPIRE_MINUTES,
     )
 
@@ -276,9 +277,12 @@ def send_and_save_code(email: str, user_name: str, provider: EmailProvider):
 
     # Send the notification
     provider.send_notification(
-        code=verification_code,
-        recipient_email=email,
-        recipient_name=user_name,
+        EmailNotificationPayload(
+            message=verification_code,
+            recipient_name=user_name,
+            subject="Verify your email",
+            email_address=email,
+        )
     )
 
 
@@ -377,7 +381,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is missing"
         )
 
-    decoded_data = decode_token(token, JWT_SECRET)
+    decoded_data = decode_token(token, settings.jwt_config.secret_key)
     if USER_ID not in decoded_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"

@@ -15,24 +15,23 @@ Features:
 - Uses TOTP (Time-based One-Time Password) for secure authentication.
 """
 
-import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pyotp
 import redis
-from omegaconf import DictConfig
 from redis import Redis
 from SmartApi import SmartConnect
 
+from app.core.config import SmartAPISettings, settings
+from app.core.mixins import FactoryMixin
 from app.data_layer.data_models.credential_model import (
     SmartAPICredentialInput,
     SmartAPICredentialOutput,
 )
 from app.utils.common.logger import get_logger
 from app.utils.credentials.base_credential_manager import CredentialManager
-from app.utils.fetch_data import get_env_var
 from app.utils.redis_utils import RedisSyncConnection
 
 logger = get_logger(Path(__file__).name)
@@ -40,7 +39,8 @@ logger = get_logger(Path(__file__).name)
 
 @CredentialManager.register("smartapi_credential_manager")
 class SmartapiCredentialManager(
-    CredentialManager[SmartAPICredentialInput, SmartAPICredentialOutput]
+    CredentialManager[SmartAPICredentialInput, SmartAPICredentialOutput],
+    FactoryMixin[SmartAPISettings],
 ):
     """
     Credentials class to store the credentials required to authenticate the SmartAPI connection.
@@ -53,9 +53,7 @@ class SmartapiCredentialManager(
         The output credentials generated from the input credentials
     """
 
-    _connection_lock = threading.Lock()
-    total_connections = 3
-    current_connection = 0
+    max_connections = 4
 
     def __init__(
         self,
@@ -235,7 +233,7 @@ class SmartapiCredentialManager(
             The output credentials generated from the input credentials
         """
         try:
-            redis_connection = RedisSyncConnection()
+            redis_connection = RedisSyncConnection.build(settings.redis_config)
             client = redis_connection.get_connection()
             key = f"smartapi_credentials:{credential_input.client_id}:{credential_input.connection_num}"
 
@@ -261,60 +259,22 @@ class SmartapiCredentialManager(
             redis_connection.close_connection()
 
     @classmethod
-    def from_cfg(cls, cfg: DictConfig | None = None) -> "SmartapiCredentialManager":
-        """
-        Create a Credentials object from the credentials file.
-
-        Parameters:
-        -----------
-        cfg: ``DictConfig``
-            The configuration object containing the credentials
-
-        Returns:
-        --------
-        ``SmartapiCredentialManager``
-            The Credentials object with the credentials
-        """
-
-        if cfg is None:
-            cfg = DictConfig({})
-
-        connection_num = cfg.get("connection_num")
-
-        if connection_num is None:
-            connection_num = cls.current_connection % cls.total_connections
-            logger.info(
-                "Connection number is not provided, using default connection number: %d",
-                connection_num,
+    def build(cls, settings: SmartAPISettings):
+        connection_num = settings.connection_num
+        if connection_num < 0 or connection_num >= cls.max_connections:
+            raise ValueError(
+                f"connection_num must be between 0 and {cls.max_connections} but got {connection_num}"
             )
-        if connection_num >= cls.total_connections:
-            original_connection_num = connection_num
-            connection_num = connection_num % cls.total_connections
-            logger.info(
-                "Connection number %d exceeds total connections %d, using modulo: %d",
-                original_connection_num,
-                cls.total_connections,
-                connection_num,
-            )
-
-        api_key = get_env_var("SMARTAPI_API_KEY")
-        client_id = get_env_var("SMARTAPI_CLIENT_ID")
-        pwd = get_env_var("SMARTAPI_PWD")
-        token = get_env_var("SMARTAPI_TOKEN")
 
         smart_credential_input = SmartAPICredentialInput(
-            api_key=api_key,
-            client_id=client_id,
-            pwd=pwd,
-            token=token,
+            api_key=settings.api_key,
+            client_id=settings.client_id,
+            pwd=settings.password,
+            token=settings.token,
             connection_num=connection_num,
         )
-        smart_credentials = cls.generate_credentials(smart_credential_input)
-
-        with cls._connection_lock:
-            cls.current_connection = (connection_num + 1) % cls.total_connections
-
+        smart_credential = cls.generate_credentials(smart_credential_input)
         return cls(
             smart_credential_input,
-            smart_credentials,
+            smart_credential,
         )

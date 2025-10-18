@@ -3,16 +3,17 @@ import asyncio
 from pathlib import Path
 
 # --- Third-Party Imports ---
-from dotenv import load_dotenv
 from fastapi import FastAPI, Request, status
+from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi_limiter import FastAPILimiter
 
 from app.core.app_state import AppState
-from app.core.singleton import Singleton
 
 # --- Project Imports ---
+from app.core.config import settings
+from app.core.singleton import Singleton
 from app.data_layer.streaming.consumers.kafka_consumer import KafkaConsumer
 from app.sockets.websocket_server_manager import ConnectionManager, RedisPubSubManager
 from app.sockets.websocket_server_protocol import StockTickerServerFactory
@@ -24,14 +25,11 @@ from app.utils.asyncio_utils.asyncio_support import (
 from app.utils.asyncio_utils.coro_utils import fire_and_forgot
 from app.utils.common.logger import get_logger
 from app.utils.constants import API_VERSION, SERVICE_NAME
-from app.utils.fetch_data import get_env_var
 from app.utils.redis_utils import RedisAsyncConnection
 from app.utils.startup_utils import create_tokens_db
 
 logger = get_logger(Path(__file__).name)
 
-# --- Environment Variables ---
-load_dotenv()
 
 # --- Install Twisted Reactor Safely ---
 install_twisted_reactor()
@@ -82,13 +80,13 @@ class FastAPIApp(metaclass=Singleton):
             )
 
             # Add CORS middleware - only once when app is created
-            cors_origins = get_env_var("CORS_ORIGINS", "*")
+            cors_origins = settings.middleware_config.cors_origins
             if cors_origins is None:
                 cors_origins = "*"
 
             cls._app.add_middleware(
                 CORSMiddleware,
-                allow_origins=cors_origins.split(","),
+                allow_origins=cors_origins,
                 allow_credentials=True,
                 allow_methods=["*"],
                 allow_headers=["*"],
@@ -163,8 +161,8 @@ async def _initialize_websocket_server():
         return False
 
     try:
-        ws_host = get_env_var("WEBSOCKET_HOST")
-        ws_port = int(get_env_var("WEBSOCKET_PORT"))
+        ws_host = settings.websocket_config.host
+        ws_port = settings.websocket_config.port
 
         if ws_port == 8000:
             raise ValueError("WebSocket port cannot be the same as FastAPI port (8000)")
@@ -189,7 +187,6 @@ async def _initialize_websocket_server():
         return False
 
 
-@app.on_event("startup")
 async def startup_event():
     """
     Application startup event to initialize services.
@@ -211,14 +208,14 @@ async def startup_event():
         logger.info("Tokens database initialized")
 
         # Initialize Redis connection
-        redis_connection = RedisAsyncConnection()
+        redis_connection = RedisAsyncConnection.build(settings.redis_config)
         AppState.redis_client = await redis_connection.get_connection()
 
         # Initialize rate limiter
         await FastAPILimiter.init(AppState.redis_client)
         logger.info("Request rate limiter initialized")
 
-        kafka_consumer = KafkaConsumer()
+        kafka_consumer = KafkaConsumer.build(settings.kafka_config)
         AppState.kafka_consumer = kafka_consumer
         AppState.kafka_consumer_task = fire_and_forgot(
             kafka_consumer.consume_messages()
@@ -317,7 +314,6 @@ async def _shutdown_kafka_consumer():
         AppState.kafka_consumer = None
 
 
-@app.on_event("shutdown")
 async def shutdown_event():
     """
     Application shutdown event to clean up resources.
@@ -327,7 +323,9 @@ async def shutdown_event():
     - Cancels Kafka consumer task
     - Closes Redis connections and all managed resources
     """
-    await RedisAsyncConnection().close_connection()  # Close Redis connection pool
+    await RedisAsyncConnection.build(
+        settings.redis_config
+    ).close_connection()
 
     if not AppState.startup_complete:
         logger.info("Shutdown called before startup completed")
@@ -341,3 +339,15 @@ async def shutdown_event():
     await _shutdown_kafka_consumer()
 
     logger.info("%s shutdown complete", SERVICE_NAME)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan event handler for startup and shutdown events.
+    """
+    # Startup
+    await _startup_event()
+    yield
+    # Shutdown
+    await _shutdown_event()

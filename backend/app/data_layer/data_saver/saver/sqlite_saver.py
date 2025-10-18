@@ -76,19 +76,20 @@ class SqliteDataSaver(DataSaver):
             present in the database. The presence of the data is checked based
             on the primary key of the InstrumentPrice object.
         """
-        instrument_price = InstrumentPrice(
-            retrieval_timestamp=data["retrieval_timestamp"],
-            last_traded_timestamp=data["last_traded_timestamp"],
-            symbol=data["symbol"],
-            exchange_id=data["exchange_id"],
-            data_provider_id=data["data_provider_id"],
-            last_traded_price=data["last_traded_price"],
-            last_traded_quantity=data.get("last_traded_quantity"),
-            average_traded_price=data.get("average_traded_price"),
-            volume_trade_for_the_day=data.get("volume_trade_for_the_day"),
-            total_buy_quantity=data.get("total_buy_quantity"),
-            total_sell_quantity=data.get("total_sell_quantity"),
-        )
+        instrument_data={
+            "retrieval_timestamp": data["retrieval_timestamp"],
+            "last_traded_timestamp": data["last_traded_timestamp"],
+            "symbol": data["symbol"],
+            "exchange_id": data["exchange_id"],
+            "data_provider_id": data["data_provider_id"],
+            "last_traded_price": data["last_traded_price"],
+            "last_traded_quantity": data.get("last_traded_quantity"),
+            "average_traded_price": data.get("average_traded_price"),
+            "volume_trade_for_the_day": data.get("volume_trade_for_the_day"),
+            "total_buy_quantity": data.get("total_buy_quantity"),
+            "total_sell_quantity": data.get("total_sell_quantity"),
+        }
+        instrument_price = InstrumentPrice.model_validate(instrument_data)
         with get_session(self.engine) as session:
             insert_data(InstrumentPrice, instrument_price, session=session)
 

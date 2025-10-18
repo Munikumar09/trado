@@ -6,17 +6,17 @@ from zoneinfo import ZoneInfo
 
 import pyotp
 import requests
-from omegaconf import DictConfig
 from playwright.sync_api import Playwright, sync_playwright
 from redis import Redis, RedisError
 
+from app.core.config import UplinkSettings, settings
+from app.core.mixins import FactoryMixin
 from app.data_layer.data_models.credential_model import (
     UplinkCredentialInput,
     UplinkCredentialOutput,
 )
 from app.utils.common.logger import get_logger
 from app.utils.credentials.base_credential_manager import CredentialManager
-from app.utils.fetch_data import get_env_var
 from app.utils.redis_utils import RedisSyncConnection
 from app.utils.urls import REDIRECT_URI, UPLINK_ACCESS_TOKEN_URL, UPLINK_AUTH_URL
 
@@ -25,7 +25,8 @@ logger = get_logger(Path(__file__).name)
 
 @CredentialManager.register("uplink_credential_manager")
 class UplinkCredentialManager(
-    CredentialManager[UplinkCredentialInput, UplinkCredentialOutput]
+    CredentialManager[UplinkCredentialInput, UplinkCredentialOutput],
+    FactoryMixin[UplinkSettings],
 ):
     """
     Credentials class to store the credentials required to authenticate the Uplink connection
@@ -37,6 +38,8 @@ class UplinkCredentialManager(
     credentials: ``UplinkCredentialOutput``
         The output credentials for the Uplink connection
     """
+
+    max_connections = 1
 
     def __init__(
         self,
@@ -283,9 +286,9 @@ class UplinkCredentialManager(
             The output data containing the access token
         """
         try:
-            redis_connection = RedisSyncConnection()
+            redis_connection = RedisSyncConnection.build(settings.redis_config)
             redis_client = redis_connection.get_connection()
-            key = f"uplink_credentials:{credential_input.api_key}"
+            key = f"uplink_credentials:{credential_input.api_key}_{credential_input.connection_num}"
 
             temp_manager = cls(
                 credential_input, UplinkCredentialOutput(access_token="")
@@ -305,36 +308,34 @@ class UplinkCredentialManager(
             redis_connection.close_connection()
 
     @classmethod
-    def from_cfg(
-        cls, cfg: DictConfig | None = None  # pylint: disable=unused-argument
-    ) -> (
-        "UplinkCredentialManager"
-    ):  # *args are used to make this method compatible for initialization from init_from_cfg
+    def build(cls, settings: UplinkSettings) -> "UplinkCredentialManager":
         """
-        Initialize a UplinkCredentialManager instance using environment variables.
+        Build a UplinkCredentialManager instance from the provided settings.
 
         Parameters
         ----------
-        cfg: ``DictConfig | None``
-            Config not used in this method, but included for compatibility with init_from_cfg
+        settings: ``BaseSettings``
+            The settings object containing the necessary configuration
 
         Returns
         -------
         ``UplinkCredentialManager``
-            An instance of UplinkCredentialManager initialized with credentials from environment variables
+            An instance of UplinkCredentialManager
         """
-        api_key = get_env_var("UPLINK_API_KEY")
-        secret_key = get_env_var("UPLINK_SECRET_KEY")
-        totp_key = get_env_var("UPLINK_TOTP_KEY")
-        mobile_no = get_env_var("UPLINK_MOBILE_NO")
-        pin = get_env_var("UPLINK_PIN")
+        connection_num = settings.connection_num
+
+        if connection_num < 0 or connection_num >= cls.max_connections:
+            raise ValueError(
+                f"connection_num must be between 0 and {cls.max_connections} but got {connection_num}"
+            )
 
         credential_input = UplinkCredentialInput(
-            api_key=api_key,
-            secret_key=secret_key,
-            totp_key=totp_key,
-            mobile_no=mobile_no,
-            pin=pin,
+            api_key=settings.api_key,
+            secret_key=settings.secret_key,
+            totp_key=settings.totp_key,
+            mobile_no=settings.mobile_no,
+            pin=settings.pin,
+            connection_num=connection_num,
         )
         credentials = cls.generate_credentials(credential_input)
 

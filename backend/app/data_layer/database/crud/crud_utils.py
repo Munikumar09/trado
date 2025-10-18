@@ -334,6 +334,7 @@ def _insert_or_ignore(
         for i in range(0, len(data_to_insert), INSERTION_BATCH_SIZE):
             try:
                 batch_data = data_to_insert[i : i + INSERTION_BATCH_SIZE]
+                print("Inserting batch:", batch_data)
                 insert_stmt = sqlite_insert(table).values(batch_data)
                 insert_stmt = insert_stmt.on_conflict_do_nothing()
                 session.exec(insert_stmt)  # type: ignore

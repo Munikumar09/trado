@@ -5,8 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
-from omegaconf import DictConfig
-
+from app.core.config import settings
 from app.sockets.twisted_socket import MarketDataTwistedSocket
 from app.sockets.websocket_client_protocol import MarketDataWebSocketClientProtocol
 from app.utils.common.logger import get_logger
@@ -447,9 +446,10 @@ class SmartSocket(MarketDataTwistedSocket):
         """
         Initialize the SmartSocket connection with the specified configuration.
         """
-        smartapi_connection = SmartapiCredentialManager.from_cfg(
-            DictConfig({"connection_num": instance_num})
+        smartapi_settings = settings.smartapi_config.model_copy(
+            update={"connection_num": instance_num}
         )
+        smartapi_connection = SmartapiCredentialManager.build(smartapi_settings)
 
         auth_token = smartapi_connection.credentials.access_token
         feed_token = smartapi_connection.credentials.feed_token

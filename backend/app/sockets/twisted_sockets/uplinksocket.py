@@ -8,6 +8,7 @@ import requests
 from google.protobuf.json_format import MessageToDict
 
 import app.sockets.twisted_sockets.uplink_data_decoder as decoder
+from app.core.config import settings
 from app.sockets.twisted_socket import MarketDataTwistedSocket
 from app.sockets.websocket_client_protocol import MarketDataWebSocketClientProtocol
 from app.utils.common.logger import get_logger
@@ -332,7 +333,10 @@ class UplinkSocket(MarketDataTwistedSocket):
         """
         Initialize the UplinkSocket connection with the specified configuration.
         """
-        credential_manager = UplinkCredentialManager.from_cfg()
+        uplink_settings = settings.uplink_config.model_copy(
+            update={"connection_num": 0}
+        )
+        credential_manager = UplinkCredentialManager.build(uplink_settings)
         access_tokens = credential_manager.credentials.access_token
 
         if access_tokens == "":

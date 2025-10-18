@@ -1,27 +1,23 @@
 import asyncio
+from asyncio import CancelledError
 import json
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, Optional, cast
+from typing import Any, cast
 
 from confluent_kafka import Consumer as ConfluentConsumer
 from confluent_kafka import KafkaException
-from omegaconf import DictConfig
 from redis.asyncio import Redis
 
 from app.cache.instrument_cache import update_stock_cache
+from app.core.config import settings, IS_TEST_ENV
+from app.core.mixins import FactoryMixin
 from app.data_layer.streaming.consumer import Consumer
 from app.utils.common.logger import get_logger
 from app.utils.common.types.financial_types import DataProviderType, ExchangeType
-from app.utils.constants import (
-    CHANNEL_PREFIX,
-    KAFKA_BROKER_URL_ENV,
-    KAFKA_CONSUMER_GROUP_ID_ENV,
-    KAFKA_TOPIC_INSTRUMENT_ENV,
-)
-from app.utils.fetch_data import get_env_var
+from app.utils.constants import CHANNEL_PREFIX
 from app.utils.redis_utils import RedisAsyncConnection
 
 logger = get_logger(Path(__file__).name)
@@ -42,7 +38,7 @@ MAX_BACKOFF_TIME = 60  # seconds
 MAX_BACKOFF_ATTEMPTS = 10
 
 
-class KafkaConsumer(Consumer):
+class KafkaConsumer(Consumer, FactoryMixin):
     """
     Kafka-based consumer implementation for market data streaming.
 
@@ -58,43 +54,20 @@ class KafkaConsumer(Consumer):
         The consumer group ID for tracking consumption progress
     brokers: ``str``
         The comma-separated list of Kafka broker URLs
-    config: ``Dict[str, Any]``
-        Additional Kafka consumer configuration parameters
     """
 
     def __init__(
         self,
-        topic: str | None = None,
-        group_id: str | None = None,
-        brokers: str | None = None,
-        config: dict[str, Any] | None = None,
+        topic: str,
+        group_id: str,
+        brokers: str,
     ) -> None:
         """
-        Initialize a Kafka consumer for market data.
-
-        Creates a new Kafka consumer with the specified parameters or defaults
-        from environment variables. Sets up a thread pool for handling blocking
-        Kafka operations without blocking the asyncio event loop.
-
-        Parameters
-        ----------
-        topic: ``str | None``, ( default = None)
-            The Kafka topic to subscribe to. If None, uses the KAFKA_TOPIC_INSTRUMENT
-            environment variable.
-        group_id: ``str | None``, ( default = None))
-            The consumer group ID. If None, uses the KAFKA_CONSUMER_GROUP_ID
-            environment variable.
-        brokers: ``str | None``, ( default = None))
-            The Kafka broker URL(s). If None, uses the KAFKA_BROKER_URL
-            environment variable.
-        config: ``dict[str, Any] | None``, ( default = None))
-            Additional Kafka consumer configuration. If provided, these settings
-            will override the default configuration values.
+        Initialize a Kafka consumer.
         """
-        self.topic = topic or get_env_var(KAFKA_TOPIC_INSTRUMENT_ENV)
-        self.group_id = group_id or get_env_var(KAFKA_CONSUMER_GROUP_ID_ENV)
-        self.brokers = brokers or get_env_var(KAFKA_BROKER_URL_ENV)
-        self.config = {**DEFAULT_CONFIG, **(config or {})}
+        self.topic = topic
+        self.group_id = group_id
+        self.brokers = brokers
 
         # Create thread pool for blocking Kafka operations
         self._executor = ThreadPoolExecutor(
@@ -114,17 +87,17 @@ class KafkaConsumer(Consumer):
         consumer: ``ConfluentConsumer``
             A configured and subscribed Confluent Kafka consumer instance
         """
-        config: Dict[str, Any] = {
+        config: dict[str, Any] = {
             "bootstrap.servers": self.brokers,
             "group.id": self.group_id,
-            **self.config,
+            **DEFAULT_CONFIG,
         }
         consumer = ConfluentConsumer(config)
         consumer.subscribe([self.topic])
         logger.info(
             "Subscribed to Kafka topic '%s' with config: %s",
             self.topic,
-            {k: v for k, v in config.items() if k != "bootstrap.servers"},
+            config,
         )
 
         return consumer
@@ -151,7 +124,6 @@ class KafkaConsumer(Consumer):
         msg = self.consumer.poll(timeout=1.0)
         if msg is None:
             return None
-
         if msg.error():
             raise KafkaException(msg.error())
 
@@ -206,9 +178,10 @@ class KafkaConsumer(Consumer):
             symbol = data.get("symbol")
             exchange = data.get("exchange")
 
-            if not symbol or not exchange:
+            if not (symbol and exchange):
                 logger.warning(
-                    "Message missing required fields (symbol or exchange): %s", data
+                    "Skipping message: missing required field(s). Expected both 'symbol' and 'exchange', got data=%s",
+                    data,
                 )
                 return
 
@@ -268,7 +241,7 @@ class KafkaConsumer(Consumer):
 
         await asyncio.sleep(backoff_time)
 
-    async def consume_messages(self) -> None:
+    async def consume_messages(self, max_messages: int | None = None) -> None:
         """
         Continuously consume and process messages from Kafka.
 
@@ -277,12 +250,21 @@ class KafkaConsumer(Consumer):
         the cache. Implements robust error handling with exponential backoff for
         transient failures and automatic consumer restart for persistent issues.
 
+        Parameters
+        ----------
+        max_messages: ``int``
+            Maximum number of messages to process. This is for testing purposes.
+
         Raises
         ------
         ``Exception``
             Fatal errors that cannot be handled within the retry mechanism
             will be propagated after resource cleanup
         """
+        if max_messages and not IS_TEST_ENV:
+            raise ValueError("max_messages can only be set in test environment")
+
+        processed_messages = 0
         logger.info(
             "Starting Kafka consumer (topic=%s, group=%s)",
             self.topic,
@@ -290,15 +272,21 @@ class KafkaConsumer(Consumer):
         )
 
         self._should_run = True
-        redis_async_connection = RedisAsyncConnection()
-        redis_client = await redis_async_connection.get_connection()
 
         consecutive_errors = 0
         last_success_time = time.time()
 
         try:
+            redis_async_connection = RedisAsyncConnection.build(settings.redis_config)
+
+            redis_client = await redis_async_connection.get_connection()
             loop = asyncio.get_running_loop()
             while self._should_run:
+                processed_messages += 1
+                if max_messages and processed_messages > max_messages:
+                    logger.info("Max messages reached, stopping consumer.")
+                    break
+
                 try:
                     raw = await loop.run_in_executor(self._executor, self._poll_message)
                     if not raw:
@@ -316,7 +304,7 @@ class KafkaConsumer(Consumer):
                     consecutive_errors = 0
                     last_success_time = time.time()
 
-                except asyncio.CancelledError:
+                except CancelledError:
                     logger.info("Cancellation requested, stopping consumer loop.")
                     break
 
@@ -359,46 +347,3 @@ class KafkaConsumer(Consumer):
         """
         logger.info("Received stop signal for Kafka consumer")
         self._should_run = False
-
-    @classmethod
-    def from_cfg(cls, cfg: DictConfig) -> Optional["KafkaConsumer"]:
-        """
-        Create a KafkaConsumer instance from a configuration object.
-
-        Factory method to instantiate and configure a Kafka consumer
-        using parameters defined in a configuration object.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing Kafka settings including:
-            - topic: The Kafka topic to subscribe to
-            - group_id: The consumer group ID
-            - brokers: The Kafka broker URL(s)
-            - consumer_config: Additional configuration parameters
-
-        Returns
-        -------
-        consumer: ``KafkaConsumer | None``
-            A configured KafkaConsumer instance if the configuration is valid,
-            or None if the configuration is invalid or an error occurs
-        """
-        try:
-            config_dict = {}
-
-            if "consumer_config" in cfg:
-                consumer_config = cfg.consumer_config
-                if hasattr(consumer_config, "to_dict"):
-                    config_dict = consumer_config.to_dict()
-                else:
-                    config_dict = dict(consumer_config)
-
-            return cls(
-                topic=cfg.get("topic"),
-                group_id=cfg.get("group_id"),
-                brokers=cfg.get("brokers"),
-                config=config_dict,
-            )
-        except Exception as e:
-            logger.error("Failed to create KafkaConsumer from config: %s", e)
-            return None

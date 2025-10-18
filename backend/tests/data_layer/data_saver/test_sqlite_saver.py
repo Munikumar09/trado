@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Generator, List, Optional
 from unittest.mock import MagicMock
+from pydantic_core._pydantic_core import ValidationError
 
 import pytest
 from confluent_kafka.error import KafkaError, KafkaException
@@ -597,19 +598,13 @@ def test_save_unicode_special_and_null_handling(
     special_chars_data = create_test_instrument_price_data(symbol="SPE©IAL_ÇH@RS_ñ_ü_é")
     special_chars_data["last_traded_quantity"] = None
     special_chars_data["average_traded_price"] = ""  # Empty string
-    saver.save_stock_data(special_chars_data)
+    with pytest.raises(ValidationError):
+        saver.save_stock_data(special_chars_data)
 
-    # Verify both were saved correctly
-    saved_data = verify_saved_data_count(saver, 2)
+    # Verify only 1 was saved correctly
+    saved_data = verify_saved_data_count(saver, 1)
     symbols = {item.symbol for item in saved_data}
     assert "测试股票" in symbols
-    assert "SPE©IAL_ÇH@RS_ñ_ü_é" in symbols
-
-    # Verify null handling
-    special_item = next(
-        item for item in saved_data if item.symbol == "SPE©IAL_ÇH@RS_ñ_ü_é"
-    )
-    assert special_item.last_traded_quantity is None
 
 
 # ======================================================================================

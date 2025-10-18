@@ -37,7 +37,7 @@ from app.routers.authentication.authenticate import (
 from app.routers.authentication.authentication import router
 from app.routers.authentication.user_validation import verify_password
 from app.schemas.user_model import UserSignup
-from app.utils.constants import JWT_REFRESH_SECRET, JWT_SECRET
+from app.core.config import settings
 from main import app
 
 client = TestClient(router)
@@ -46,6 +46,8 @@ client = TestClient(router)
 #################### FIXTURES ####################
 
 VALID_PASSWORD = "Password123!"
+JWT_SECRET = settings.jwt_config.secret_key
+JWT_REFRESH_SECRET = settings.jwt_config.refresh_secret_key
 
 
 class MockNotificationProvider:

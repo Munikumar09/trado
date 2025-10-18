@@ -5,14 +5,14 @@ from typing import Optional
 import redis
 import redis.asyncio as async_redis
 
+from app.core.mixins import FactoryMixin
 from app.core.singleton import Singleton
 from app.utils.common.logger import get_logger
-from app.utils.fetch_data import get_env_var
 
 logger = get_logger(Path(__file__).name)
 
 
-class RedisConnection(metaclass=Singleton):
+class RedisConnection(FactoryMixin, metaclass=Singleton):
     """
     Redis connection manager class. This class is a singleton that manages the connection to a
     Redis server. It provides methods to get a connection and close it.
@@ -37,17 +37,17 @@ class RedisConnection(metaclass=Singleton):
 
     def __init__(
         self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        db: Optional[int] = None,
+        host: str,
+        port: int,
+        db: int,
         decode_responses: bool = True,
         socket_timeout: int = 5,
         socket_connect_timeout: int = 5,
         retry_on_timeout: bool = True,
     ) -> None:
-        self.host: str = host or get_env_var("REDIS_HOST")
-        self.port: int = int(port or get_env_var("REDIS_PORT"))
-        self.db: int = int(db or get_env_var("REDIS_DB"))
+        self.host: str = host
+        self.port: int = port
+        self.db: int = db
         self.decode_responses = decode_responses
         self.socket_timeout = socket_timeout
         self.socket_connect_timeout = socket_connect_timeout

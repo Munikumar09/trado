@@ -199,8 +199,8 @@ def test_create_or_update_user_verification(session):
     user_verification = UserVerification(
         email=TEST_EMAIL,
         verification_code="123456",
-        expiration_time=datetime.now(timezone.utc).timestamp(),
-        reverified_datetime="2023-12-01T12:00:00",
+        expiration_time=int(datetime.now(timezone.utc).timestamp()),
+        reverified_datetime=datetime.fromisoformat("2023-12-01T12:00:00"),
     )
     create_or_update_user_verification(user_verification, session=session)
     result = get_user_verification(TEST_EMAIL, session=session)
@@ -210,8 +210,8 @@ def test_create_or_update_user_verification(session):
     updated_verification = UserVerification(
         email=TEST_EMAIL,
         verification_code="654321",
-        expiration_time=datetime.now(timezone.utc).timestamp(),
-        reverified_datetime="2024-12-01T12:00:00",
+        expiration_time=int(datetime.now(timezone.utc).timestamp()),
+        reverified_datetime=datetime.fromisoformat("2024-12-01T12:00:00"),
     )
     create_or_update_user_verification(updated_verification, session=session)
     result = get_user_verification(TEST_EMAIL, session=session)
@@ -222,7 +222,7 @@ def test_create_or_update_user_verification(session):
     updated_verification = UserVerification(
         email=TEST_EMAIL,
         verification_code="654322",
-        expiration_time=datetime.now(timezone.utc).timestamp(),
+        expiration_time=int(datetime.now(timezone.utc).timestamp()),
     )
     create_or_update_user_verification(updated_verification, session=session)
     result = get_user_verification(TEST_EMAIL, session=session)

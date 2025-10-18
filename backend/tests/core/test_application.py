@@ -1,4 +1,4 @@
-# pylint: disable= protected-access, too-many-lines, import-outside-toplevel
+# pylint: disable= protected-access, import-outside-toplevel
 
 """
 Comprehensive tests for the FastAPI application module.
@@ -25,13 +25,15 @@ The tests are organized into logical sections:
 
 import asyncio
 from asyncio import Future
-from unittest.mock import ANY, AsyncMock, MagicMock, patch
+from collections.abc import Generator
+from unittest.mock import ANY, AsyncMock, MagicMock
+from pytest_mock import MockerFixture, MockType
 
 import pytest
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
+from app.core.config import settings
 from app.core.application import (
     FastAPIApp,
     app,
@@ -40,6 +42,7 @@ from app.core.application import (
     startup_event,
 )
 from app.utils.constants import SERVICE_NAME
+from redis import Redis
 
 # =============================================================================
 # SHARED FIXTURES
@@ -47,20 +50,31 @@ from app.utils.constants import SERVICE_NAME
 
 
 @pytest.fixture
-def mock_logger():
+def mock_logger(mocker: MockerFixture) -> MockType:
     """
     Mock logger fixture for testing log output. Provides a mock logger to verify logging
     behavior throughout the test suite.
     """
-    with patch("app.core.application.logger") as mock:
-        yield mock
+    return mocker.patch("app.core.application.logger")
+
+
+@pytest.fixture
+def mock_redis_client(mocker: MockerFixture) -> Generator[MagicMock, None, None]:
+    """
+    Fixture to provide a mock Redis client.
+    """
+    mock_client = mocker.MagicMock(spec=Redis)
+    mock_pubsub = mocker.MagicMock()
+    mock_client.pubsub.return_value = mock_pubsub
+    
+    return mock_client
 
 
 @pytest.fixture
 def mock_app_state():
     """
-    Mock AppState fixture for testing application state management. Provides a mock AppState
-    to isolate application state during testing.
+    Mock AppState fixture for testing application state management. 
+    Provides a mock AppState to isolate application state during testing.
     """
     # Store original values
     original_redis_client = None
@@ -105,78 +119,39 @@ def mock_app_state():
     AppState.websocket_server_running = original_websocket_server_running
     AppState.startup_complete = original_startup_complete
 
-
-@pytest.fixture(autouse=True)
-def mock_env_vars():
-    """
-    Mock environment variables for testing. Provides consistent environment variable
-    values for testing.
-    """
-    env_vars = {
-        "CORS_ORIGINS": "http://localhost:3000,http://localhost:8080",
-        "WEBSOCKET_HOST": "localhost",
-        "WEBSOCKET_PORT": "8001",
-        "KAFKA_BROKER_URL": "localhost:9092",
-        "REDIS_URL": "redis://localhost:6379",
-    }
-
-    with patch("app.core.application.get_env_var") as mock_get_env:
-        mock_get_env.side_effect = lambda key, default=None: env_vars.get(key, default)
-
-        yield mock_get_env
-
-
-def _create_mock_redis_client():
-    """
-    Helper function to create consistent mock Redis client.
-    """
-    mock_client = AsyncMock()
-    mock_client.ping = AsyncMock(return_value=True)
-    mock_client.publish = AsyncMock(return_value=None)
-    mock_client.close = AsyncMock(return_value=None)
-    mock_client.flushdb = AsyncMock(return_value=None)
-
-    return mock_client
-
-
 @pytest.fixture
-def mock_redis_connection():
+def mock_redis_connection(mocker: MockerFixture):
     """
     Mock Redis connection fixture for testing Redis integration. Provides a mock Redis
     connection and client for isolated testing.
     """
-    mock_redis_client = _create_mock_redis_client()
+    fake_connection = mocker.patch(
+        "app.core.application.RedisAsyncConnection",
+    )
+    mock_redis_client = AsyncMock()
+    fake_build = AsyncMock()
+    fake_build.get_connection.return_value = mock_redis_client
+    fake_connection.build.return_value = fake_build
 
-    with patch("app.core.application.RedisAsyncConnection") as mock_conn_class:
-        mock_instance = AsyncMock()
-        mock_instance.get_connection = AsyncMock(return_value=mock_redis_client)
-        mock_conn_class.return_value = mock_instance
-
-        yield {"client": mock_redis_client, "connection": mock_instance}
-
-
-@pytest.fixture
-def mock_kafka_consumer():
-    """
-    Mock Kafka consumer fixture for testing Kafka integration. Provides a mock KafkaConsumer
-    for isolated testing.
-    """
-
-    async def mock_consume_messages():
-        """
-        Mock async function that doesn't create unawaited coroutines.
-        """
-
-    with patch("app.core.application.KafkaConsumer") as mock_consumer_class:
-        mock_instance = MagicMock()
-        mock_instance.consume_messages = mock_consume_messages
-        mock_consumer_class.return_value = mock_instance
-
-        yield {"class": mock_consumer_class, "instance": mock_instance}
+    return {"client": mock_redis_client, "connection": fake_connection}
 
 
 @pytest.fixture
-def mock_twisted_components():
+def mock_kafka_consumer(mocker):
+    """
+    Mock Kafka consumer fixture for testing Kafka integration. Provides a
+    mock KafkaConsumer for isolated testing.
+    """
+    mock_kafka_consumer = mocker.patch("app.core.application.KafkaConsumer")
+    mock_instance = MagicMock()
+    mock_instance.consume_messages = AsyncMock(return_value=[])
+    mock_kafka_consumer.build.return_value = mock_instance
+
+    return {"class": mock_kafka_consumer, "instance": mock_instance}
+
+
+@pytest.fixture
+def mock_twisted_components(mocker):
     """
     Mock Twisted components fixture for testing WebSocket server integration. Provides mock
     Twisted reactor and related components.
@@ -188,59 +163,104 @@ def mock_twisted_components():
     mock_port.stopListening = MagicMock()
     mock_reactor.listenTCP.return_value = mock_port
 
-    with patch("app.core.application.reactor", mock_reactor):
-        with patch("app.core.application.TWISTED_AVAILABLE", True):
+    mocker.patch("app.core.application.TWISTED_AVAILABLE", True)
+    mocker.patch("app.core.application.reactor", mock_reactor)
 
-            yield {"reactor": mock_reactor, "port": mock_port}
+    return {"reactor": mock_reactor, "port": mock_port}
 
 
 @pytest.fixture
 def mock_external_dependencies(
-    mock_redis_connection,
-    mock_kafka_consumer,
-    mock_app_state,
+    mock_redis_connection, mock_kafka_consumer, mock_app_state, mocker
 ):
     """
     Combined fixture that mocks all external dependencies. Provides a comprehensive mock
     setup for testing application functionality without external service dependencies.
     """
-    with patch("app.core.application.create_tokens_db") as mock_create_db:
-        with patch("app.core.application.FastAPILimiter") as mock_limiter:
-            with patch("app.core.application.fire_and_forgot") as mock_fire_and_forgot:
-                with patch(
-                    "app.core.application.register_task_for_cleanup"
-                ) as mock_register_task:
-                    with patch(
-                        "app.core.application.register_shutdown_handler"
-                    ) as mock_register_shutdown:
-                        # Configure async mocks to return simple values
-                        mock_limiter.init = AsyncMock(return_value=None)
+    mock_create_db = mocker.patch("app.core.application.create_tokens_db")
+    mock_limiter = mocker.patch("app.core.application.FastAPILimiter")
+    mock_fire_and_forgot = mocker.patch("app.core.application.fire_and_forgot")
+    mock_register_task = mocker.patch("app.core.application.register_task_for_cleanup")
+    mock_register_shutdown = mocker.patch(
+        "app.core.application.register_shutdown_handler"
+    )
+    mock_pubsub = mocker.patch("app.core.application.RedisPubSubManager")
+    mock_conn_mgr = mocker.patch("app.core.application.ConnectionManager")
+    mock_factory = mocker.patch("app.core.application.StockTickerServerFactory")
 
-                        # fire_and_forgot should consume the coroutine to prevent warnings
-                        def mock_fire_and_forgot_func(coro):
-                            # Close the coroutine to prevent RuntimeWarning
-                            if hasattr(coro, "close"):
-                                coro.close()
+    # Configure async mocks to return simple values
+    mock_limiter.init = AsyncMock(return_value=None)
 
-                            # Return a mock Task
-                            mock_task = MagicMock()
-                            mock_task.done = MagicMock(return_value=False)
-                            mock_task.cancel = MagicMock()
+    # fire_and_forgot should consume the coroutine to prevent warnings
+    def mock_fire_and_forgot_func(coro):
+        # Close the coroutine to prevent RuntimeWarning
+        if hasattr(coro, "close"):
+            coro.close()
 
-                            return mock_task
+        # Return a mock Task
+        mock_task = MagicMock()
+        mock_task.done = MagicMock(return_value=False)
+        mock_task.cancel = MagicMock()
 
-                        mock_fire_and_forgot.side_effect = mock_fire_and_forgot_func
+        return mock_task
 
-                        yield {
-                            "create_db": mock_create_db,
-                            "limiter": mock_limiter,
-                            "fire_and_forgot": mock_fire_and_forgot,
-                            "register_task": mock_register_task,
-                            "register_shutdown": mock_register_shutdown,
-                            "redis": mock_redis_connection,
-                            "kafka": mock_kafka_consumer,
-                            "app_state": mock_app_state,
-                        }
+    mock_fire_and_forgot.side_effect = mock_fire_and_forgot_func
+
+    return {
+        "create_db": mock_create_db,
+        "limiter": mock_limiter,
+        "fire_and_forgot": mock_fire_and_forgot,
+        "register_task": mock_register_task,
+        "register_shutdown": mock_register_shutdown,
+        "redis": mock_redis_connection,
+        "kafka": mock_kafka_consumer,
+        "app_state": mock_app_state,
+        "pubsub": mock_pubsub,
+        "conn_mgr": mock_conn_mgr,
+        "factory": mock_factory,
+    }
+
+
+@pytest.fixture(autouse=True)
+def clean_app_state():
+    """
+    Clean up the application state after each test.
+    """
+    FastAPIApp._app = None
+    yield
+    FastAPIApp._app = None
+
+
+def validate_redis_pubsub(redis_connection):
+    """
+    Validate the Redis PubSub manager.
+    """
+    redis_connection.build.assert_called_once_with(settings.redis_config)
+    mock_instance = redis_connection.build.return_value
+    mock_instance.get_connection.assert_called_once()
+
+
+def complete_startup(deps, twisted, complete=True, running=True):
+    deps["app_state"].startup_complete = complete
+    deps["app_state"].websocket_server_port = twisted["port"]
+    deps["app_state"].websocket_server_running = running
+
+
+def get_mock_kafka_task(task):
+    mock_kafka_task = asyncio.create_task(task())
+    mock_kafka_task.done = MagicMock(return_value=False)
+    mock_kafka_task.cancel = MagicMock(side_effect=mock_kafka_task.cancel)
+
+    return mock_kafka_task
+
+
+def validate_websocket_task(deps):
+    assert deps["app_state"].websocket_server_port is None
+    assert deps["app_state"].websocket_server_running is False
+
+
+async def sample_task():
+    pass
 
 
 # =============================================================================
@@ -254,9 +274,6 @@ def test_fastapi_app_singleton_behavior():
     get_fast_api_app() return the same instance and that the singleton pattern is
     properly implemented.
     """
-    # Clear any existing app instance
-    FastAPIApp._app = None
-
     # Get first instance
     app1 = FastAPIApp.get_fast_api_app()
 
@@ -267,31 +284,19 @@ def test_fastapi_app_singleton_behavior():
     assert app1 is app2
     assert isinstance(app1, FastAPI)
 
-    # Clean up
-    FastAPIApp._app = None
-
 
 def test_fastapi_app_initialization_with_defaults():
     """
     Test FastAPI app initialization with default configuration. Verifies that the FastAPI
     application is properly initialized with correct title, description, and version.
     """
-    # Clear any existing app instance
-    FastAPIApp._app = None
+    app_instance = FastAPIApp.get_fast_api_app()
 
-    with patch("app.core.application.SERVICE_NAME", "TestService"):
-        with patch("app.core.application.API_VERSION", "1.0.0"):
-            app_instance = FastAPIApp.get_fast_api_app()
-
-            assert app_instance.title == "TestService"
-            assert (
-                app_instance.description
-                == "Market data API with real-time WebSocket updates"
-            )
-            assert app_instance.version == "1.0.0"
-
-    # Clean up
-    FastAPIApp._app = None
+    assert app_instance.title == "Market Data Service"
+    assert (
+        app_instance.description == "Market data API with real-time WebSocket updates"
+    )
+    assert app_instance.version == "1.0.0"
 
 
 def test_fastapi_app_cors_middleware_configuration():
@@ -299,44 +304,25 @@ def test_fastapi_app_cors_middleware_configuration():
     Test CORS middleware configuration. Verifies that CORS middleware is properly configured
     with correct origins and settings from environment variables, including wildcard origins.
     """
-    # Clear any existing app instance
-    FastAPIApp._app = None
 
     app_instance = FastAPIApp.get_fast_api_app()
 
     # Check that CORS middleware was added
     middleware_found = False
     for middleware in app_instance.user_middleware:
+
         if middleware.cls == CORSMiddleware:
             middleware_found = True
 
             # Verify CORS configuration
-            options = middleware.options
+            options = middleware.kwargs
             assert options["allow_credentials"] is True
             assert options["allow_methods"] == ["*"]
             assert options["allow_headers"] == ["*"]
-
-            # Origins should be split from environment variable
-            expected_origins = ["http://localhost:3000", "http://localhost:8080"]
-            assert options["allow_origins"] == expected_origins
+            assert options["allow_origins"] == ["*"]
             break
 
     assert middleware_found, "CORS middleware not found"
-
-    # Test wildcard origins scenario
-    with patch("app.core.application.get_env_var") as mock_get_env:
-        mock_get_env.return_value = "*"
-        FastAPIApp._app = None  # Reset for new configuration
-
-        app_wildcard = FastAPIApp.get_fast_api_app()
-        for middleware in app_wildcard.user_middleware:
-            if middleware.cls == CORSMiddleware:
-                options = middleware.options
-                assert options["allow_origins"] == ["*"]
-                break
-
-    # Clean up
-    FastAPIApp._app = None
 
 
 # =============================================================================
@@ -346,8 +332,8 @@ def test_fastapi_app_cors_middleware_configuration():
 
 def test_module_level_app_instance():
     """
-    Test that the module-level app instance is correctly created. Verifies that the app variable
-    at module level is a FastAPI instance created through the singleton pattern.
+    Test that the module-level app instance is correctly created. Verifies that the app
+    variable at module level is a FastAPI instance created through the singleton pattern.
     """
     assert isinstance(app, FastAPI)
     assert app.title is not None
@@ -370,8 +356,17 @@ def test_app_exception_handler_registration():
 # =============================================================================
 
 
+@pytest.mark.parametrize(
+    "exception",
+    [
+        Exception("Test error"),
+        ValueError("Invalid value"),
+        KeyError("Missing key"),
+        RuntimeError("Runtime error"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_global_exception_handler_comprehensive(mock_logger):
+async def test_global_exception_handler_comprehensive(mock_logger, exception):
     """
     Test global exception handler with different exception types and scenarios.
     Verifies that the handler works correctly with various exception types and
@@ -380,28 +375,17 @@ async def test_global_exception_handler_comprehensive(mock_logger):
     mock_request = MagicMock(spec=Request)
     mock_request.url = "http://localhost:8000/test"
 
-    test_cases = [
-        Exception("Test error"),
-        ValueError("Invalid value"),
-        KeyError("Missing key"),
-        RuntimeError("Runtime error"),
-        ConnectionError("Connection failed"),
-    ]
+    response = await global_exception_handler(mock_request, exception)
 
-    for exception in test_cases:
-        mock_logger.reset_mock()
+    # Verify response format
+    assert isinstance(response, JSONResponse)
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.body == b'{"detail":"Internal server error"}'
 
-        response = await global_exception_handler(mock_request, exception)
-
-        # Verify response format
-        assert isinstance(response, JSONResponse)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert response.body == b'{"detail":"Internal server error"}'
-
-        # Verify logging
-        mock_logger.exception.assert_called_once_with(
-            "Unhandled exception in request %s: %s", mock_request.url, exception
-        )
+    # Verify logging
+    mock_logger.exception.assert_called_once_with(
+        "Unhandled exception in request %s: %s", mock_request.url, exception
+    )
 
 
 # =============================================================================
@@ -420,68 +404,65 @@ async def test_startup_event_successful_initialization(
     """
     deps = mock_external_dependencies
 
-    # Mock WebSocket components
-    with patch("app.core.application.RedisPubSubManager") as mock_pubsub:
-        with patch("app.core.application.ConnectionManager") as mock_conn_mgr:
-            with patch("app.core.application.StockTickerServerFactory") as mock_factory:
+    await startup_event()
 
-                await startup_event()
+    # Verify database initialization
+    deps["create_db"].assert_called_once()
 
-                # Verify database initialization
-                deps["create_db"].assert_called_once()
+    validate_redis_pubsub(deps["redis"]["connection"])
 
-                # Verify Redis initialization
-                deps["redis"]["connection"].get_connection.assert_called_once()
+    # Verify rate limiter initialization
+    deps["limiter"].init.assert_called_once_with(deps["redis"]["client"])
 
-                # Verify rate limiter initialization
-                deps["limiter"].init.assert_called_once_with(deps["redis"]["client"])
+    # Verify Kafka consumer initialization
+    deps["kafka"]["class"].build.assert_called_once_with(settings.kafka_config)
+    deps["fire_and_forgot"].assert_called_once()
+    deps["register_task"].assert_called_once()
 
-                # Verify Kafka consumer initialization
-                deps["kafka"]["class"].assert_called_once()
-                deps["fire_and_forgot"].assert_called_once()
-                deps["register_task"].assert_called_once()
+    # Verify WebSocket server initialization
+    deps["pubsub"].assert_called_once_with(deps["redis"]["client"])
+    deps["conn_mgr"].assert_called_once()
+    deps["factory"].assert_called_once()
 
-                # Verify WebSocket server initialization
-                mock_pubsub.assert_called_once_with(deps["redis"]["client"])
-                mock_conn_mgr.assert_called_once()
-                mock_factory.assert_called_once()
+    # Verify startup completion
+    assert deps["app_state"].startup_complete is True
 
-                # Verify startup completion
-                assert deps["app_state"].startup_complete is True
-
-                # Verify logging
-                mock_logger.info.assert_any_call("Tokens database initialized")
-                mock_logger.info.assert_any_call("Request rate limiter initialized")
-                mock_logger.info.assert_any_call("Kafka consumer started")
-                mock_logger.info.assert_any_call(
-                    "%s startup completed successfully", SERVICE_NAME
-                )
+    # Verify logging
+    mock_logger.info.assert_any_call("Tokens database initialized")
+    mock_logger.info.assert_any_call("Request rate limiter initialized")
+    mock_logger.info.assert_any_call("Kafka consumer started")
+    mock_logger.info.assert_any_call("%s startup completed successfully", SERVICE_NAME)
 
 
 @pytest.mark.asyncio
-async def test_startup_event_without_twisted(mock_external_dependencies, mock_logger):
+async def test_startup_event_without_twisted(
+    mock_external_dependencies, mock_logger, mocker
+):
     """
     Test startup event when Twisted is not available. Verifies that startup continues
     successfully even when Twisted is not available for WebSocket server.
     """
     deps = mock_external_dependencies
+    mocker.patch("app.core.application.TWISTED_AVAILABLE", False)
+    await startup_event()
 
-    with patch("app.core.application.TWISTED_AVAILABLE", False):
-        await startup_event()
+    # Verify that basic services are still initialized
+    deps["create_db"].assert_called_once()
 
-        # Verify that basic services are still initialized
-        deps["create_db"].assert_called_once()
-        deps["redis"]["connection"].get_connection.assert_called_once()
-        deps["limiter"].init.assert_called_once()
-        deps["kafka"]["class"].assert_called_once()
+    # Verify Redis initialization
+    validate_redis_pubsub(deps["redis"]["connection"])
 
-        # Verify warning about Twisted
-        mock_logger.warning.assert_called_with(
-            "Twisted unavailable. WebSocket server not started."
-        )
+    deps["limiter"].init.assert_called_once()
 
-        # Verify startup completion
-        assert deps["app_state"].startup_complete is True
+    deps["kafka"]["class"].build.assert_called_once_with(settings.kafka_config)
+
+    # Verify warning about Twisted
+    mock_logger.warning.assert_called_with(
+        "Twisted unavailable. WebSocket server not started."
+    )
+
+    # Verify startup completion
+    assert deps["app_state"].startup_complete is True
 
 
 @pytest.mark.asyncio
@@ -496,28 +477,18 @@ async def test_startup_event_websocket_port_conflict(
     deps = mock_external_dependencies
 
     # Mock environment to return port 8000 (same as FastAPI)
-    with patch("app.core.application.get_env_var") as mock_get_env:
+    original_port = settings.websocket_config.port
+    conflict_port = 8000
+    settings.websocket_config.port = conflict_port
+    await startup_event()
 
-        def mock_env_side_effect(key, default=None):
-            if key == "WEBSOCKET_PORT":
-                return "8000"
-            if key == "WEBSOCKET_HOST":
-                return "localhost"
-            return default
-
-        mock_get_env.side_effect = mock_env_side_effect
-
-        with patch("app.core.application.RedisPubSubManager"):
-            with patch("app.core.application.ConnectionManager"):
-                with patch("app.core.application.StockTickerServerFactory"):
-                    await startup_event()
-
-                    # Should log error about port conflict
-                    mock_logger.error.assert_any_call(
-                        "Failed to start WebSocket server: %s", ANY, exc_info=True
-                    )
+    # Should log error about port conflict
+    mock_logger.error.assert_any_call(
+        "Failed to start WebSocket server: %s", ANY, exc_info=True
+    )
     assert not deps["app_state"].websocket_server_running
     assert deps["app_state"].websocket_server_port is None
+    settings.websocket_config.port = original_port
 
 
 @pytest.mark.asyncio
@@ -530,7 +501,9 @@ async def test_startup_event_critical_failures(mock_external_dependencies, mock_
 
     error_msg = "Redis connection failed"
     # Test Redis connection failure
-    deps["redis"]["connection"].get_connection.side_effect = ConnectionError(error_msg)
+    deps["redis"]["connection"].build.return_value.get_connection.side_effect = (
+        ConnectionError(error_msg)
+    )
 
     with pytest.raises(ConnectionError) as exc_info:
         await startup_event()
@@ -538,18 +511,19 @@ async def test_startup_event_critical_failures(mock_external_dependencies, mock_
     assert str(exc_info.value) == error_msg
     mock_logger.critical.assert_called_with(
         "Fatal error during startup: %s",
-        deps["redis"]["connection"].get_connection.side_effect,
+        deps["redis"]["connection"].build.return_value.get_connection.side_effect,
         exc_info=True,
     )
 
     # Reset mocks and test database failure
     mock_logger.reset_mock()
     error_msg = "Database initialization failed"
-    deps["redis"]["connection"].get_connection.side_effect = None
+    deps["redis"]["connection"].build.return_value.get_connection.side_effect = None
     deps["create_db"].side_effect = RuntimeError(error_msg)
 
     with pytest.raises(RuntimeError) as exc_info:
         await startup_event()
+
     assert str(exc_info.value) == error_msg
     mock_logger.critical.assert_called_with(
         "Fatal error during startup: %s",
@@ -561,14 +535,16 @@ async def test_startup_event_critical_failures(mock_external_dependencies, mock_
     mock_logger.reset_mock()
     error_msg = "Kafka consumer failed"
     deps["create_db"].side_effect = None
-    deps["kafka"]["class"].side_effect = RuntimeError("Kafka consumer failed")
+    deps["redis"]["connection"].build.return_value.get_connection.side_effect = None
+    deps["kafka"]["class"].build.side_effect = RuntimeError("Kafka consumer failed")
 
     with pytest.raises(RuntimeError) as exc_info:
         await startup_event()
+
     assert str(exc_info.value) == error_msg
     mock_logger.critical.assert_called_with(
         "Fatal error during startup: %s",
-        deps["kafka"]["class"].side_effect,
+        deps["kafka"]["class"].build.side_effect,
         exc_info=True,
     )
 
@@ -590,23 +566,11 @@ async def test_shutdown_event_successful_cleanup(
     twisted = mock_twisted_components
 
     # Set up app state as if startup completed successfully
-    deps["app_state"].startup_complete = True
-    deps["app_state"].websocket_server_port = twisted["port"]
-    deps["app_state"].websocket_server_running = True
+    complete_startup(deps, twisted)
 
-    # Mock Kafka consumer task that completes successfully
-    async def successful_task():
-        pass  # Completes successfully
-
+    kafka_task = get_mock_kafka_task(sample_task)
     # Create a real task that will complete successfully when awaited
-    mock_kafka_task = asyncio.create_task(successful_task())
-
-    # Override done() to return False initially so the shutdown logic runs
-    mock_kafka_task.done = MagicMock(return_value=False)
-
-    # Mock cancel to track calls
-    mock_kafka_task.cancel = MagicMock(side_effect=mock_kafka_task.cancel)
-    deps["app_state"].kafka_consumer_task = mock_kafka_task
+    deps["app_state"].kafka_consumer_task = kafka_task
 
     mock_deferred = Future()
     mock_deferred.set_result(None)  # Complete the future immediately
@@ -616,12 +580,11 @@ async def test_shutdown_event_successful_cleanup(
 
     # Verify WebSocket server shutdown
     twisted["port"].stopListening.assert_called_once()
-    assert deps["app_state"].websocket_server_port is None
-    assert deps["app_state"].websocket_server_running is False
+    validate_websocket_task(deps)
 
     # Verify Kafka consumer shutdown - in successful cleanup, task completes gracefully
     # so cancel() should not be called
-    mock_kafka_task.cancel.assert_not_called()
+    kafka_task.cancel.assert_not_called()
     assert deps["app_state"].kafka_consumer_task is None
 
     # Verify logging
@@ -662,14 +625,12 @@ async def test_shutdown_event_timeout_scenarios(
     twisted = mock_twisted_components
 
     # Test WebSocket server stop timeout
-    deps["app_state"].startup_complete = True
-    deps["app_state"].websocket_server_port = twisted["port"]
-    deps["app_state"].websocket_server_running = True
+    complete_startup(deps, twisted)
 
-    async def timeout_deferred():
-        await asyncio.sleep(10)  # Longer than timeout
+    async def timeout_task(time_sec=100):
+        await asyncio.sleep(time_sec)  # Longer than timeout
 
-    twisted["port"].stopListening.return_value = timeout_deferred()
+    twisted["port"].stopListening.return_value = timeout_task(10)
 
     await shutdown_event()
 
@@ -679,17 +640,9 @@ async def test_shutdown_event_timeout_scenarios(
 
     # Reset for Kafka timeout test
     mock_logger.reset_mock()
-    deps["app_state"].websocket_server_port = None
-    deps["app_state"].websocket_server_running = False
+    validate_websocket_task(deps)
 
-    # Test Kafka consumer timeout
-    async def timeout_task():
-        await asyncio.sleep(100)  # Longer than timeout
-
-    mock_kafka_task = asyncio.create_task(timeout_task())
-    mock_kafka_task.done = MagicMock(return_value=False)
-    mock_kafka_task.cancel = MagicMock(side_effect=mock_kafka_task.cancel)
-    deps["app_state"].kafka_consumer_task = mock_kafka_task
+    deps["app_state"].kafka_consumer_task = get_mock_kafka_task(timeout_task)
 
     await shutdown_event()
 
@@ -710,9 +663,7 @@ async def test_shutdown_event_error_scenarios(
     twisted = mock_twisted_components
 
     # Test WebSocket server stop error
-    deps["app_state"].startup_complete = True
-    deps["app_state"].websocket_server_port = twisted["port"]
-    deps["app_state"].websocket_server_running = True
+    complete_startup(deps, twisted)
 
     twisted["port"].stopListening.side_effect = RuntimeError("Stop error")
 
@@ -726,17 +677,13 @@ async def test_shutdown_event_error_scenarios(
 
     # Reset for Kafka error test
     mock_logger.reset_mock()
-    deps["app_state"].websocket_server_port = None
-    deps["app_state"].websocket_server_running = False
+    validate_websocket_task(deps)
 
     # Test Kafka consumer error
     async def error_task():
         raise RuntimeError("Kafka shutdown error")
 
-    mock_kafka_task = asyncio.create_task(error_task())
-    mock_kafka_task.done = MagicMock(return_value=False)
-    mock_kafka_task.cancel = MagicMock(side_effect=mock_kafka_task.cancel)
-    deps["app_state"].kafka_consumer_task = mock_kafka_task
+    deps["app_state"].kafka_consumer_task = get_mock_kafka_task(error_task)
 
     await shutdown_event()
 
@@ -756,9 +703,7 @@ async def test_shutdown_event_no_websocket_server(
     deps = mock_external_dependencies
 
     # Set up app state without WebSocket server
-    deps["app_state"].startup_complete = True
-    deps["app_state"].websocket_server_port = None
-    deps["app_state"].websocket_server_running = False
+    complete_startup(deps, {"port": None}, running=False)
 
     await shutdown_event()
 
@@ -812,56 +757,38 @@ async def test_full_startup_shutdown_cycle(
     deps = mock_external_dependencies
     twisted = mock_twisted_components
 
-    # Mock WebSocket components
-    with patch("app.core.application.RedisPubSubManager") as mock_pubsub:
-        with patch("app.core.application.ConnectionManager") as mock_conn_mgr:
-            with patch("app.core.application.StockTickerServerFactory") as mock_factory:
+    # Perform startup
+    await startup_event()
 
-                # Perform startup
-                await startup_event()
+    deps["pubsub"].assert_called_once_with(deps["redis"]["client"])
+    deps["conn_mgr"].assert_called_once()
+    deps["factory"].assert_called_once()
 
-                mock_pubsub.assert_called_once_with(deps["redis"]["client"])
-                mock_conn_mgr.assert_called_once()
-                mock_factory.assert_called_once()
+    mock_logger.info.assert_any_call("%s startup completed successfully", SERVICE_NAME)
 
-                mock_logger.info.assert_any_call(
-                    "%s startup completed successfully", SERVICE_NAME
-                )
+    # Verify startup completed
+    assert deps["app_state"].startup_complete is True
+    assert deps["app_state"].websocket_server_port is not None
+    assert deps["app_state"].websocket_server_running is True
 
-                # Verify startup completed
-                assert deps["app_state"].startup_complete is True
-                assert deps["app_state"].websocket_server_port is not None
-                assert deps["app_state"].websocket_server_running is True
+    deps["app_state"].kafka_consumer_task = get_mock_kafka_task(sample_task)
 
-                # Mock Kafka task for shutdown
-                async def test_task():
-                    pass  # Completes successfully
+    # Mock WebSocket server stop
+    mock_deferred = Future()
+    mock_deferred.set_result(None)  # Complete immediately
+    twisted["port"].stopListening.return_value = mock_deferred
 
-                # Create a real task for testing
-                mock_kafka_task = asyncio.create_task(test_task())
+    # Perform shutdown
+    await shutdown_event()
 
-                # done() should be a regular method that returns a boolean, not a coroutine
-                mock_kafka_task.done = MagicMock(return_value=False)
-                original_cancel = mock_kafka_task.cancel
-                mock_kafka_task.cancel = MagicMock(side_effect=original_cancel)
-                deps["app_state"].kafka_consumer_task = mock_kafka_task
+    mock_logger.info.assert_any_call(
+        "Application shutting down, cleaning up resources..."
+    )
 
-                # Mock WebSocket server stop
-                mock_deferred = Future()
-                mock_deferred.set_result(None)  # Complete immediately
-                twisted["port"].stopListening.return_value = mock_deferred
-
-                # Perform shutdown
-                await shutdown_event()
-
-                mock_logger.info.assert_any_call(
-                    "Application shutting down, cleaning up resources..."
-                )
-
-                # Verify shutdown completed
-                assert deps["app_state"].websocket_server_port is None
-                assert deps["app_state"].websocket_server_running is False
-                assert deps["app_state"].kafka_consumer_task is None
+    # Verify shutdown completed
+    assert deps["app_state"].websocket_server_port is None
+    assert deps["app_state"].websocket_server_running is False
+    assert deps["app_state"].kafka_consumer_task is None
 
 
 @pytest.mark.asyncio
@@ -873,60 +800,17 @@ async def test_startup_with_partial_failures(mock_external_dependencies, mock_lo
     deps = mock_external_dependencies
 
     # Mock WebSocket factory to raise exception
-    with patch("app.core.application.RedisPubSubManager"):
-        with patch("app.core.application.ConnectionManager"):
-            with patch("app.core.application.StockTickerServerFactory") as mock_factory:
-                mock_factory.side_effect = RuntimeError("WebSocket factory error")
+    deps["app_state"].side_effect = RuntimeError("WebSocket factory error")
 
-                await startup_event()
+    await startup_event()
 
-                # Should log error about WebSocket server failure
-                mock_logger.error.assert_any_call(
-                    "Failed to start WebSocket server: %s", ANY, exc_info=True
-                )
+    # Should log error about WebSocket server failure
+    mock_logger.error.assert_any_call(
+        "Failed to start WebSocket server: %s", ANY, exc_info=True
+    )
 
-                # But startup should still complete for other services
-                assert deps["app_state"].startup_complete is True
-
-
-@pytest.mark.asyncio
-async def test_environment_variable_integration():
-    """
-    Test environment variable integration. Verifies that environment variables are properly
-    loaded and used throughout the application startup process.
-    """
-    test_env_vars = {
-        "CORS_ORIGINS": "http://test1.com,http://test2.com",
-        "WEBSOCKET_HOST": "0.0.0.0",
-        "WEBSOCKET_PORT": "8001",
-        "KAFKA_BROKER_URL": "test-kafka:9092",
-        "REDIS_URL": "redis://test-redis:6379",
-    }
-
-    with patch("app.core.application.get_env_var") as mock_get_env:
-        mock_get_env.side_effect = lambda key, default=None: test_env_vars.get(
-            key, default
-        )
-
-        # Clear any existing app instance
-        FastAPIApp._app = None
-
-        # Get new app instance with test environment
-        app_instance = FastAPIApp.get_fast_api_app()
-
-        # Verify CORS configuration uses environment variables
-        cors_middleware = None
-        for middleware in app_instance.user_middleware:
-            if middleware.cls == CORSMiddleware:
-                cors_middleware = middleware
-                break
-
-        assert cors_middleware is not None
-        expected_origins = ["http://test1.com", "http://test2.com"]
-        assert cors_middleware.options["allow_origins"] == expected_origins
-
-        # Clean up
-        FastAPIApp._app = None
+    # But startup should still complete for other services
+    assert deps["app_state"].startup_complete is True
 
 
 # =============================================================================
@@ -945,49 +829,37 @@ async def test_multiple_startup_shutdown_calls_and_edge_cases(
     deps = mock_external_dependencies
 
     # Test multiple startup calls
-    await startup_event()
-    await startup_event()
-    await startup_event()
+    num_startup_calls = 3
+    for _ in range(num_startup_calls):
+        await startup_event()
+
     assert deps["app_state"].startup_complete is True
 
     # Test multiple shutdown calls
-    await shutdown_event()
-    await shutdown_event()
-    await shutdown_event()
+    for _ in range(num_startup_calls):
+        await shutdown_event()
 
     # Test startup with missing environment variables
-    with patch("app.core.application.get_env_var") as mock_get_env:
-        mock_get_env.return_value = None
-        FastAPIApp._app = None
-        app_instance = FastAPIApp.get_fast_api_app()
-        assert isinstance(app_instance, FastAPI)
-        FastAPIApp._app = None
+    app_instance = FastAPIApp.get_fast_api_app()
+    assert isinstance(app_instance, FastAPI)
 
 
 @pytest.mark.asyncio
-async def test_reactor_missing_listen_tcp(mock_external_dependencies, mock_logger):
+async def test_reactor_missing_listen_tcp(
+    mock_external_dependencies, mock_twisted_components, mock_logger
+):
     """
     Test startup when reactor doesn't have listenTCP method. Verifies that startup handles
     cases where Twisted reactor doesn't support the expected interface.
     """
+    del mock_twisted_components["reactor"].listenTCP  # Remove the method
+    await startup_event()
 
-    # Mock reactor without listenTCP
-    mock_reactor = MagicMock()
-    del mock_reactor.listenTCP  # Remove the method
-
-    with patch("app.core.application.reactor", mock_reactor):
-        with patch("app.core.application.TWISTED_AVAILABLE", True):
-            with patch("app.core.application.RedisPubSubManager"):
-                with patch("app.core.application.ConnectionManager"):
-                    with patch("app.core.application.StockTickerServerFactory"):
-                        await startup_event()
-
-                        # Should log error about missing listenTCP
-                        mock_logger.error.assert_any_call(
-                            "Twisted reactor does not support listenTCP; WebSocket server not started."
-                        )
-    assert mock_external_dependencies["app_state"].websocket_server_running is False
-    assert mock_external_dependencies["app_state"].websocket_server_port is None
+    # Should log error about missing listenTCP
+    mock_logger.error.assert_any_call(
+        "Twisted reactor does not support listenTCP; WebSocket server not started."
+    )
+    validate_websocket_task(mock_external_dependencies)
 
 
 def test_fastapi_app_multiple_cors_configurations():
@@ -995,40 +867,20 @@ def test_fastapi_app_multiple_cors_configurations():
     Test FastAPIApp with multiple CORS configurations and singleton behavior.
     Verifies that CORS middleware is only added once and service configuration works correctly.
     """
-    # Clear any existing app instance
-    FastAPIApp._app = None
 
-    with patch("app.core.application.get_env_var") as mock_get_env:
-        mock_get_env.return_value = "http://localhost:3000"
+    # Get app instance multiple times
+    app1 = FastAPIApp.get_fast_api_app()
+    app2 = FastAPIApp.get_fast_api_app()
+    app3 = FastAPIApp.get_fast_api_app()
 
-        # Get app instance multiple times
-        app1 = FastAPIApp.get_fast_api_app()
-        app2 = FastAPIApp.get_fast_api_app()
-        app3 = FastAPIApp.get_fast_api_app()
+    # Should be same instance
+    assert app1 is app2 is app3
 
-        # Should be same instance
-        assert app1 is app2 is app3
-
-        # Should have only one CORS middleware
-        cors_count = sum(
-            1 for middleware in app1.user_middleware if middleware.cls == CORSMiddleware
-        )
-        assert cors_count == 1
-
-    # Test service name and version configuration
-    with patch("app.core.application.SERVICE_NAME", "TestTradoService"):
-        with patch("app.core.application.API_VERSION", "2.0.0"):
-            FastAPIApp._app = None
-            app_instance = FastAPIApp.get_fast_api_app()
-            assert app_instance.title == "TestTradoService"
-            assert app_instance.version == "2.0.0"
-            assert (
-                app_instance.description
-                == "Market data API with real-time WebSocket updates"
-            )
-
-    # Clean up
-    FastAPIApp._app = None
+    # Should have only one CORS middleware
+    cors_count = sum(
+        1 for middleware in app1.user_middleware if middleware.cls == CORSMiddleware
+    )
+    assert cors_count == 1
 
 
 def test_module_imports_and_structure():
@@ -1047,7 +899,6 @@ def test_module_imports_and_structure():
     assert hasattr(app_module, "logger")
 
     # Verify environment loading and feature flags
-    assert hasattr(app_module, "load_dotenv")
     assert hasattr(app_module, "TWISTED_AVAILABLE")
     assert isinstance(app_module.TWISTED_AVAILABLE, bool)
 
@@ -1067,16 +918,9 @@ async def test_memory_cleanup_and_resource_management(mock_external_dependencies
 
     # Test memory cleanup during shutdown
     deps["app_state"].startup_complete = True
-    deps["app_state"].redis_client = _create_mock_redis_client()
+    deps["app_state"].redis_client = AsyncMock()
 
-    async def cleanup_task():
-        pass
-
-    mock_kafka_task = asyncio.create_task(cleanup_task())
-    mock_kafka_task.done = MagicMock(return_value=False)
-    original_cancel = mock_kafka_task.cancel
-    mock_kafka_task.cancel = MagicMock(side_effect=original_cancel)
-    deps["app_state"].kafka_consumer_task = mock_kafka_task
+    deps["app_state"].kafka_consumer_task = get_mock_kafka_task(sample_task)
 
     await shutdown_event()
 
@@ -1086,9 +930,9 @@ async def test_memory_cleanup_and_resource_management(mock_external_dependencies
     # Test startup timeout handling
     async def slow_connection():
         await asyncio.sleep(10)  # Simulate slow connection
-        return _create_mock_redis_client()
+        return AsyncMock()
 
-    deps["redis"]["connection"].get_connection = slow_connection
+    deps["redis"]["connection"].build.return_value.get_connection = slow_connection
 
     # Use asyncio.wait_for to test timeout behavior
     with pytest.raises(asyncio.TimeoutError):

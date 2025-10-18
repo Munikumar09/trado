@@ -2,6 +2,7 @@ import pytest
 
 from app.data_layer.database.models import Instrument, InstrumentPrice
 from app.utils.common.types.financial_types import DataProviderType, ExchangeType
+from datetime import datetime
 
 
 @pytest.fixture
@@ -37,8 +38,8 @@ def sample_instrument_price_data() -> dict[str, str | int | None]:
     Sample stock price info dictionary
     """
     return {
-        "retrieval_timestamp": "2021-09-30 10:00:00",
-        "last_traded_timestamp": "2021-09-30 09:59:59",
+        "retrieval_timestamp": datetime.strptime("2021-09-30 10:00:00", "%Y-%m-%d %H:%M:%S"),
+        "last_traded_timestamp": datetime.strptime("2021-09-30 09:59:59", "%Y-%m-%d %H:%M:%S"),
         "symbol": "INFY",
         "exchange_id": ExchangeType.NSE.value,
         "data_provider_id": DataProviderType.SMARTAPI.value,

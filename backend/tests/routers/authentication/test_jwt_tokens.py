@@ -9,7 +9,12 @@ from app.routers.authentication.jwt_tokens import (
     create_token,
     decode_token,
 )
-from app.utils.constants import JWT_REFRESH_SECRET, JWT_SECRET
+from app.core.config import settings
+
+
+
+JWT_SECRET = settings.jwt_config.secret_key
+JWT_REFRESH_SECRET = settings.jwt_config.refresh_secret_key
 
 
 # Test: 1

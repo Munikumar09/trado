@@ -4,15 +4,9 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from fastapi import HTTPException, status
 
+from app.core.config import settings
 from app.data_layer.database.crud.user_crud import get_user
-from app.utils.constants import (
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    EMAIL,
-    JWT_HASHING_ALGO,
-    JWT_REFRESH_SECRET,
-    JWT_SECRET,
-    USER_ID,
-)
+from app.utils.constants import ACCESS_TOKEN_EXPIRE_MINUTES, EMAIL, USER_ID
 
 
 def create_token(data: dict, secret: str, expire_time: float) -> str:
@@ -41,7 +35,7 @@ def create_token(data: dict, secret: str, expire_time: float) -> str:
         {"exp": datetime.now(timezone.utc) + timedelta(minutes=expire_time)}
     )
 
-    return jwt.encode(to_encode, secret, algorithm=JWT_HASHING_ALGO)
+    return jwt.encode(to_encode, secret, algorithm=settings.jwt_config.hashing_algo)
 
 
 def decode_token(token: str, secret: str) -> dict[str, str]:
@@ -62,7 +56,7 @@ def decode_token(token: str, secret: str) -> dict[str, str]:
         The decoded data from the token
     """
     try:
-        return jwt.decode(token, secret, algorithms=[JWT_HASHING_ALGO])
+        return jwt.decode(token, secret, algorithms=[settings.jwt_config.hashing_algo])
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token has expired") from exc
     except jwt.InvalidTokenError as exc:
@@ -85,13 +79,13 @@ def access_token_from_refresh_token(refresh_token: str) -> dict[str, str]:
     ``dict[str, str]``
         A dictionary containing the new access token and the refresh token
     """
-    decoded_data = decode_token(refresh_token, JWT_REFRESH_SECRET)
+    decoded_data = decode_token(refresh_token, settings.jwt_config.refresh_secret_key)
 
     get_user(decoded_data[USER_ID])
 
     access_token = create_token(
         {USER_ID: decoded_data[USER_ID], EMAIL: decoded_data[EMAIL]},
-        JWT_SECRET,
+        settings.jwt_config.secret_key,
         ACCESS_TOKEN_EXPIRE_MINUTES,
     )
 

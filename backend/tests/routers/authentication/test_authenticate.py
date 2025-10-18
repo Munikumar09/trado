@@ -18,7 +18,8 @@ from app.routers.authentication.authenticate import (
     update_user_verification_status,
 )
 from app.schemas.user_model import UserSignup
-from app.utils.constants import JWT_SECRET
+from app.core.config import settings
+
 
 
 # Test: 1
@@ -132,7 +133,7 @@ def test_get_current_user(
     """
     Test get_current_user function
     """
-    token = create_token(token_data, JWT_SECRET, 15)
+    token = create_token(token_data, settings.jwt_config.secret_key, 15)
     mock_session.first.return_value = test_user
     user = get_current_user(token)
     assert user.model_dump() == test_user.model_dump()

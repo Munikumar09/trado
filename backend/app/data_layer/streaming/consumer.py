@@ -3,9 +3,8 @@ This module contains the base class for all Consumer classes.
 """
 
 from abc import ABC, ABCMeta, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
-from omegaconf import DictConfig
 from registrable import Registrable
 
 from app.core.singleton import Singleton
@@ -68,33 +67,6 @@ class Consumer(ABC, Registrable, metaclass=ConsumerMeta):
             The result of the message consumption process, which can vary
             depending on the implementation. This could be a list of messages,
             a status report, or any other relevant information.
-
-        Raises
-        ------
-        ``NotImplementedError``
-            If the method is not implemented by a subclass
-        """
-
-    @classmethod
-    @abstractmethod
-    def from_cfg(cls, cfg: DictConfig) -> Optional["Consumer"]:
-        """
-        Creates a consumer instance from configuration.
-
-        Factory method to instantiate a concrete consumer implementation
-        using parameters specified in a configuration object.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing parameters required to
-            initialize the consumer, such as:
-
-        Returns
-        -------
-        consumer: ``Consumer | None``
-            An initialized concrete consumer instance ready to consume messages,
-            or None if the consumer cannot be created with the given configuration
 
         Raises
         ------

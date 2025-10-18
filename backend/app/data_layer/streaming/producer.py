@@ -3,9 +3,7 @@ This module contains the base class for all Producer classes.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
-from omegaconf import DictConfig
 from registrable import Registrable
 
 
@@ -81,34 +79,6 @@ class Producer(ABC, Registrable):
         Properly shuts down the producer, ensuring that any buffered messages
         are flushed and all resources (connections, threads, etc.) are properly
         released. This method should be called when the producer is no longer needed.
-
-        Raises
-        ------
-        ``NotImplementedError``
-            If the method is not implemented by a subclass
-        """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def from_cfg(cls, cfg: DictConfig) -> Optional["Producer"]:
-        """
-        Create a producer instance from configuration.
-
-        Factory method to instantiate a concrete producer implementation
-        using parameters specified in a configuration object.
-
-        Parameters
-        ----------
-        cfg: ``DictConfig``
-            Configuration object containing parameters required to
-            initialize the producer, such as:
-
-        Returns
-        -------
-        ``Producer | None``
-            An initialized concrete producer instance ready to send messages,
-            or None if the producer cannot be created with the given configuration
 
         Raises
         ------

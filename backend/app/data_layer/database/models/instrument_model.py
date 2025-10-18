@@ -7,6 +7,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     SmallInteger,
 )
+from pydantic import field_validator
 from sqlmodel import TIMESTAMP, Field, SQLModel, text
 
 
@@ -218,6 +219,28 @@ class InstrumentPrice(SQLModel, table=True):  # type: ignore
             ],
         ),
     )
+
+    @field_validator("retrieval_timestamp", "last_traded_timestamp", mode="before")
+    @classmethod
+    def parse_timestamp(cls, v):
+        """Convert float/int epoch → datetime."""
+        if isinstance(v, (int, float)):
+            return datetime.fromtimestamp(v)
+        return v
+
+    @field_validator(
+        "last_traded_quantity",
+        "volume_trade_for_the_day",
+        "total_buy_quantity",
+        "total_sell_quantity",
+        mode="before",
+    )
+    @classmethod
+    def cast_to_int(cls, v):
+        """Ensure int values (even if given as float like 0.2)."""
+        if v is None:
+            return v
+        return int(float(v))
 
     def to_dict(self):
         """

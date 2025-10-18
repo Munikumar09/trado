@@ -119,6 +119,7 @@ class UplinkCredentialInput(CredentialInput):
     totp_key: str
     mobile_no: str
     pin: str
+    connection_num: int
 
 
 @dataclass

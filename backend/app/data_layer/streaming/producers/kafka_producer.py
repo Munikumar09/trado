@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import Any, Dict, Optional
 
 from confluent_kafka import KafkaError, Message
 from confluent_kafka import Producer as ConfluentProducer
-from omegaconf import DictConfig, OmegaConf
 
+from app.core.config import KafkaSettings
+from app.core.mixins import FactoryMixin
 from app.data_layer.streaming.producer import Producer
 from app.utils.common.logger import get_logger
 
@@ -23,7 +23,7 @@ DEFAULT_CONFIG = {
 
 
 @Producer.register("kafka_producer")
-class KafkaProducer(Producer):
+class KafkaProducer(Producer, FactoryMixin[KafkaSettings]):
     """
     Kafka producer implementation for sending data to Kafka topics.
 
@@ -37,29 +37,26 @@ class KafkaProducer(Producer):
         The Kafka topic to publish messages to
     kafka_producer: ``ConfluentProducer``
         The underlying Confluent Kafka producer instance
-    config: ``Dict[str, Any]``
-        Configuration settings for the Kafka producer
     """
 
     def __init__(
         self,
         kafka_server: str,
         kafka_topic: str,
-        config: Optional[Dict[str, Any]] = None,
     ):
         self.kafka_topic = kafka_topic
 
-        # Merge default config with user-provided config
-        producer_config = {**DEFAULT_CONFIG, **(config or {})}
-        producer_config["bootstrap.servers"] = kafka_server
+        # Merge default config with user-provided configs
+        self.producer_config = DEFAULT_CONFIG.copy()
+        self.producer_config["bootstrap.servers"] = kafka_server
 
         logger.info(
             "Initializing Kafka producer for topic '%s' with config: %s",
             kafka_topic,
-            producer_config,
+            self.producer_config,
         )
 
-        self.kafka_producer = ConfluentProducer(producer_config)
+        self.kafka_producer = ConfluentProducer(self.producer_config)
         self._delivery_success_count = 0
         self._delivery_failure_count = 0
 
@@ -201,52 +198,21 @@ class KafkaProducer(Producer):
                 logger.error("Error flushing Kafka producer: %s", e)
 
     @classmethod
-    def from_cfg(cls, cfg: DictConfig) -> Optional["KafkaProducer"]:
+    def build(cls, settings: KafkaSettings) -> "KafkaProducer":
         """
-        Create a KafkaProducer instance from configuration.
-
-        Factory method that instantiates and configures a KafkaProducer
-        using parameters defined in a configuration object.
+        Build a KafkaProducer instance from the provided settings.
 
         Parameters
         ----------
-        cfg: ``DictConfig``
-            Configuration object containing Kafka settings including:
-            - kafka_server: The broker URL(s)
-            - kafka_topic: The topic to produce to
-            - producer_config: Optional additional configuration parameters
+        settings: ``KafkaSettings``
+            The Kafka settings to use for configuring the producer.
 
         Returns
         -------
-        producer: ``Optional[KafkaProducer]``
-            A configured KafkaProducer instance if the configuration is valid,
-            or None if required configuration is missing or invalid
-
+        ``KafkaProducer``
+            A configured KafkaProducer instance.
         """
-        try:
-            # Convert OmegaConf to dict
-            cfg_dict = OmegaConf.to_container(cfg, resolve=True)
-
-            if not isinstance(cfg_dict, dict):
-                logger.error("Invalid configuration format")
-                return None
-
-            kafka_server = cfg_dict.get("kafka_server")
-            kafka_topic = cfg_dict.get("kafka_topic")
-
-            if not kafka_server:
-                logger.error("Missing kafka_server in configuration")
-                return None
-
-            if not kafka_topic:
-                logger.error("Missing kafka_topic in configuration")
-                return None
-
-            # Extract producer-specific configuration if provided
-            producer_config = cfg_dict.get("producer_config", {})
-
-            return cls(kafka_server, kafka_topic, producer_config)
-
-        except Exception as e:
-            logger.error("Error creating KafkaProducer: %s", e)
-            return None
+        return cls(
+            kafka_server=settings.brokers,
+            kafka_topic=settings.topic,
+        )
