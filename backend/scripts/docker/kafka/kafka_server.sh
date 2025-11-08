@@ -1,105 +1,163 @@
 #!/bin/bash
+set -euo pipefail
 
-# Kafka configuration variables
-KAFKA_COMPOSE_SERVICE="kafka1" # Replace with your Kafka service name in Docker Compose
+### -----------------------------
+### CONFIG
+### -----------------------------
+KAFKA_SERVICE="kafka1"
+COMPOSE_FILE="../../../app/configs/docker/kafka/confluent_kafka.yaml"
+ENV_FILE="../../../.env"
+NETWORK_NAME="kafka_default"
 
-# Load environment variables from .env file
-ENV_FILE_PATH="../../../.env" # Replace with the actual path to your .env file
-
-if [ -f "$ENV_FILE_PATH" ]; then
+### Load .env
+if [[ -f "$ENV_FILE" ]]; then
 	set -o allexport
-	source "$ENV_FILE_PATH"
+	source "$ENV_FILE"
 	set +o allexport
 else
-	echo "Error: .env file not found at $ENV_FILE_PATH."
+	echo "❌ ERROR: .env not found at $ENV_FILE"
 	exit 1
 fi
-TOPIC_NAME="${KAFKA_TOPIC_INSTRUMENT:-test_topic}"    # Default to 'test_topic' if not set in .env
-PARTITIONS="${KAFKA_PARTITIONS:-5}"                   # Default to 5 if not set in .env
-REPLICATION_FACTOR="${KAFKA_REPLICATION_FACTOR:-1}"   # Default to 1 if not set in .env
-KAFKA_PORT="${KAFKA_PORT:-9092}"                      # Default to 9092 if not set in .env
-RETENTION_TIME_MINUTES="${RETENTION_TIME_MINUTES:-5}" # Default to 5 minutes if not set in .env
-RETENTION_TIME_MS=$(($RETENTION_TIME_MINUTES * 60 * 1000))
-KAFKA_COMPOSE_PATH="../../../app/configs/docker/kafka/bitnami_kafka.yaml"
 
-# Function to check if a Docker container is running
-is_container_running() {
-	docker ps -f name=$1 --format '{{.Names}}' | grep -w $1 >/dev/null
+TOPIC_NAME="${KAFKA_TOPIC_INSTRUMENT:-test_topic}"
+PARTITIONS="${KAFKA_PARTITIONS:-5}"
+REPLICAS="${KAFKA_REPLICATION_FACTOR:-1}"
+KAFKA_PORT="${KAFKA_PORT:-9092}"
+RETENTION_MIN="${RETENTION_TIME_MINUTES:-5}"
+RETENTION_MS=$((RETENTION_MIN * 60 * 1000))
+
+### -----------------------------
+### HELPERS
+### -----------------------------
+
+# Create kafka_default network if missing
+ensure_network() {
+	if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
+		echo "🌐 Creating docker network: $NETWORK_NAME"
+		docker network create "$NETWORK_NAME"
+	else
+		echo "✅ Network '$NETWORK_NAME' already exists."
+	fi
 }
 
-# Function to create the topic with retention.ms set to 2 seconds
+# Return 0 only if container is running
+is_running() {
+	docker inspect -f '{{.State.Running}}' "$KAFKA_SERVICE" 2>/dev/null | grep -qx "true"
+}
+
+# Return 0 if container exists (running or not)
+exists() {
+	docker inspect "$KAFKA_SERVICE" >/dev/null 2>&1
+}
+
+# Wait until kafka responds
+wait_for_kafka() {
+	echo "⏳ Waiting for Kafka to be ready..."
+	for i in {1..30}; do
+		if is_running && docker exec "$KAFKA_SERVICE" kafka-topics --bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT" --list >/dev/null 2>&1; then
+			echo "✅ Kafka is ready."
+			return
+		fi
+		sleep 2
+	done
+	echo "❌ Kafka did not become ready in time."
+	exit 1
+}
+
+### -----------------------------
+### TOPIC OPS
+### -----------------------------
+
 create_topic() {
-	docker exec $KAFKA_COMPOSE_SERVICE kafka-topics.sh --create \
-		--topic $TOPIC_NAME \
-		--partitions $PARTITIONS \
-		--replication-factor $REPLICATION_FACTOR \
-		--config retention.ms=$RETENTION_TIME_MS \
+	echo "➡️ Creating topic '$TOPIC_NAME'..."
+	docker exec "$KAFKA_SERVICE" kafka-topics \
+		--create \
+		--topic "$TOPIC_NAME" \
+		--partitions "$PARTITIONS" \
+		--replication-factor "$REPLICAS" \
+		--config "retention.ms=$RETENTION_MS" \
 		--if-not-exists \
-		--bootstrap-server $KAFKA_COMPOSE_SERVICE:$KAFKA_PORT
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT"
 }
 
-# Function to modify the retention time of an existing topic
-modify_topic_retention() {
-	docker exec $KAFKA_COMPOSE_SERVICE kafka-configs.sh --alter \
+modify_retention() {
+	echo "➡️ Updating retention for '$TOPIC_NAME'..."
+	docker exec "$KAFKA_SERVICE" kafka-configs \
+		--alter \
 		--entity-type topics \
-		--entity-name $TOPIC_NAME \
-		--add-config retention.ms=$RETENTION_TIME_MS \
-		--bootstrap-server $KAFKA_COMPOSE_SERVICE:$KAFKA_PORT
+		--entity-name "$TOPIC_NAME" \
+		--add-config "retention.ms=$RETENTION_MS" \
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT"
 }
 
-# Function to start Kafka
+describe_topic() {
+	docker exec "$KAFKA_SERVICE" kafka-configs \
+		--describe \
+		--entity-type topics \
+		--entity-name "$TOPIC_NAME" \
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT"
+}
+
+topic_exists() {
+	docker exec "$KAFKA_SERVICE" kafka-topics \
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT" \
+		--list | grep -Fxq "$TOPIC_NAME"
+}
+
+### -----------------------------
+### START
+### -----------------------------
+
 start_kafka() {
-	if ! is_container_running $KAFKA_COMPOSE_SERVICE; then
-		echo "Starting Kafka container..."
-		docker compose -f $KAFKA_COMPOSE_PATH up -d
-		echo "Waiting for Kafka to start..."
-		sleep 10 # Give Kafka some time to start
-		create_topic
+	ensure_network # ✅ auto-create if missing
+
+	if is_running; then
+		echo "✅ Kafka container '$KAFKA_SERVICE' already running."
 	else
-		echo "Kafka container is already running."
+		if exists; then
+			echo "↻ Container exists but not running → starting..."
+		else
+			echo "🚀 Creating and starting Kafka..."
+		fi
+		docker compose -f "$COMPOSE_FILE" up -d
 	fi
 
-	# Verify if the topic exists
-	if docker exec $KAFKA_COMPOSE_SERVICE kafka-topics.sh --list --bootstrap-server $KAFKA_COMPOSE_SERVICE:$KAFKA_PORT | grep -w $TOPIC_NAME >/dev/null; then
-		echo "Topic '$TOPIC_NAME' already exists. Modifying retention time..."
-		modify_topic_retention
+	wait_for_kafka
+
+	if topic_exists; then
+		echo "ℹ️ Topic '$TOPIC_NAME' exists → modifying retention..."
+		modify_retention
 	else
-		echo "Creating topic '$TOPIC_NAME'..."
 		create_topic
 	fi
 
-	echo "Verifying the retention time of topic '$TOPIC_NAME'..."
-	docker exec $KAFKA_COMPOSE_SERVICE kafka-configs.sh --describe \
-		--entity-type topics \
-		--entity-name $TOPIC_NAME \
-		--bootstrap-server $KAFKA_COMPOSE_SERVICE:$KAFKA_PORT
+	echo "ℹ️ Final topic config:"
+	describe_topic
 }
 
-# Function to stop Kafka
+### -----------------------------
+### STOP
+### -----------------------------
+
 stop_kafka() {
-	if is_container_running $KAFKA_COMPOSE_SERVICE; then
-		echo "Stopping Kafka container..."
-		docker compose -f $KAFKA_COMPOSE_PATH down
+	if is_running || exists; then
+		echo "🛑 Stopping Kafka..."
+		docker compose -f "$COMPOSE_FILE" down
 	else
-		echo "Kafka container is not running."
+		echo "ℹ️ Kafka container '$KAFKA_SERVICE' not found."
 	fi
 }
 
-# Check arguments
-if [ $# -eq 0 ]; then
-	echo "Error: You must provide --start or --stop as an argument."
-	exit 1
-fi
-
-case $1 in
---start)
-	start_kafka
-	;;
---stop)
-	stop_kafka
-	;;
+### -----------------------------
+### MAIN
+### -----------------------------
+case "${1:-}" in
+--start) start_kafka ;;
+--stop) stop_kafka ;;
 *)
-	echo "Error: Invalid argument. Use --start or --stop."
+	echo "Usage:"
+	echo "  $0 --start"
+	echo "  $0 --stop"
 	exit 1
 	;;
 esac

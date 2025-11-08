@@ -45,11 +45,11 @@ def create_websocket_connection(cfg: DictConfig) -> list[Thread]:
         logger.info("Creating connection instance %s", i)
 
         local_cfg = deepcopy(cfg)
-        local_cfg.current_connection_number = pre_connection_number + i
+        local_cfg.connection.current_connection_number = pre_connection_number + i
 
         websocket_connection: WebsocketConnection | None = cast(
             None | WebsocketConnection,
-            init_from_cfg(local_cfg, WebsocketConnection),
+            init_from_cfg(local_cfg.connection, WebsocketConnection),
         )
 
         if websocket_connection:
