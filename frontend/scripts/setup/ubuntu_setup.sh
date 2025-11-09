@@ -104,9 +104,10 @@ setup_android_sdk() {
     echo_info "Configuring Android environment variables in ~/.bashrc..."
     tee -a ~/.bashrc >/dev/null <<'EOF'
 
-# Android SDK Environment Variables
+# >>> Android SDK Environment Variables >>>
 export ANDROID_HOME=$HOME/Android/Sdk
 export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH
+# <<< Android SDK Environment Variables <<<
 EOF
   fi
 
@@ -114,9 +115,10 @@ EOF
     echo_info "Adding Java environment variables to ~/.bashrc..."
     tee -a ~/.bashrc >/dev/null <<'EOF'
 
-# Java Environment Variables
+# >>> Java Environment Variables >>>
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export PATH=$JAVA_HOME/bin:$PATH
+# <<< Java Environment Variables <<<
 EOF
   fi
 
@@ -176,14 +178,15 @@ install_flutter_tools() {
   if ! command_exists flutter; then
     mkdir -p "$HOME/development"
     cd "$HOME/development" || exit
-    git clone https://github.com/flutter/flutter.git -b stable
+    git clone https://github.com/flutter/flutter.git -b stable || { echo_error "Failed to clone Flutter repository."; exit 1; }
     
     if ! grep -q "# Flutter Environment Variable" ~/.bashrc; then
       echo_info "Adding Flutter to PATH in ~/.bashrc..."
       tee -a ~/.bashrc >/dev/null <<'EOF'
 
-# Flutter Environment Variable
+# >>> Flutter Environment Variable >>>
 export PATH=$PATH:$HOME/development/flutter/bin
+# <<< Flutter Environment Variable <<<
 EOF
     fi
     export PATH="$PATH:$HOME/development/flutter/bin"
@@ -202,7 +205,7 @@ EOF
   flutter doctor -v || echo_error "Flutter Doctor found issues. Please review the output above."
 
   echo_success "Flutter development environment setup completed!"
-  source ~/.bashrc
+  echo_info "Please restart your terminal or run 'source ~/.bashrc' to apply environment variable changes."
 }
 
 # ---------------------------------------------------------------------
@@ -231,9 +234,9 @@ uninstall_flutter_tools() {
 
   echo_info "Cleaning up environment variables from ~/.bashrc..."
   if [ -f "$HOME/.bashrc" ]; then
-    sed -i '/# Flutter Environment Variable/,+1d' "$HOME/.bashrc"
-    sed -i '/# Android SDK Environment Variables/,+3d' "$HOME/.bashrc"
-    sed -i '/# Java Environment Variables/,+2d' "$HOME/.bashrc"
+    sed -i '/# >>> Flutter Environment Variables >>>/,/# <<< Flutter Environment Variables <<</d' "$HOME/.bashrc"
+    sed -i '/# >>> Android SDK Environment Variables >>>/,/# <<< Android SDK Environment Variables <<</d' "$HOME/.bashrc"
+    sed -i '/# >>> Java Environment Variables >>>/,/# <<< Java Environment Variables <<</d' "$HOME/.bashrc"
   fi
 
   echo_info "Clearing Flutter cache and configs..."
