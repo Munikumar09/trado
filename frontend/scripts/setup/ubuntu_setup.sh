@@ -170,7 +170,7 @@ install_flutter_tools() {
   sudo apt update || { echo_error "Failed to update package lists."; exit 1; }
 
   echo_info "Installing essential dependencies..."
-  sudo apt install -y curl git unzip build-essential clang cmake ninja-build pkg-config libgtk-3-dev || { echo_error "Failed to install dependencies."; exit 1; }
+  sudo apt install -y curl git unzip build-essential zip xz-utils libglu1-mesa || { echo_error "Failed to install dependencies."; exit 1; }
     
   echo_info "Installing Flutter SDK..."
   if ! command_exists flutter; then
@@ -193,11 +193,16 @@ EOF
 
   setup_android_sdk
 
+  echo_info "Configuring Flutter channels and platforms..."
+  flutter config --no-enable-linux-desktop
+  flutter config --enable-web
+  flutter config --enable-android
+
   echo_info "Running Flutter Doctor..."
   flutter doctor -v || echo_error "Flutter Doctor found issues. Please review the output above."
 
   echo_success "Flutter development environment setup completed!"
-  echo_info "Restart your terminal or run 'source ~/.bashrc' for all changes to take effect."
+  source ~/.bashrc
 }
 
 # ---------------------------------------------------------------------
