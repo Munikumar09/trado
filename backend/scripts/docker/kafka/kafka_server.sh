@@ -4,10 +4,11 @@ set -euo pipefail
 ### -----------------------------
 ### CONFIG
 ### -----------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KAFKA_SERVICE="kafka1"
-COMPOSE_FILE="../../../app/configs/docker/kafka/confluent_kafka.yaml"
-ENV_FILE="../../../.env"
-NETWORK_NAME="kafka_default"
+COMPOSE_FILE="$SCRIPT_DIR/../../../app/configs/docker/kafka/confluent_kafka.yaml"
+ENV_FILE="$SCRIPT_DIR/../../../.env"
+NETWORK_NAME="kafka_network"
 
 ### Load .env
 if [[ -f "$ENV_FILE" ]]; then
@@ -23,6 +24,7 @@ TOPIC_NAME="${KAFKA_TOPIC_INSTRUMENT:-test_topic}"
 PARTITIONS="${KAFKA_PARTITIONS:-5}"
 REPLICAS="${KAFKA_REPLICATION_FACTOR:-1}"
 KAFKA_PORT="${KAFKA_PORT:-9092}"
+KAFKA_INTERNAL_PORT="${KAFKA_INTERNAL_PORT:-29092}"
 RETENTION_MIN="${RETENTION_TIME_MINUTES:-5}"
 RETENTION_MS=$((RETENTION_MIN * 60 * 1000))
 
@@ -54,7 +56,7 @@ exists() {
 wait_for_kafka() {
 	echo "⏳ Waiting for Kafka to be ready..."
 	for i in {1..30}; do
-		if is_running && docker exec "$KAFKA_SERVICE" kafka-topics --bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT" --list >/dev/null 2>&1; then
+		if is_running && docker exec "$KAFKA_SERVICE" kafka-topics --bootstrap-server "$KAFKA_SERVICE:$KAFKA_INTERNAL_PORT" --list >/dev/null 2>&1; then
 			echo "✅ Kafka is ready."
 			return
 		fi
@@ -77,7 +79,7 @@ create_topic() {
 		--replication-factor "$REPLICAS" \
 		--config "retention.ms=$RETENTION_MS" \
 		--if-not-exists \
-		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT"
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_INTERNAL_PORT"
 }
 
 modify_retention() {
@@ -87,7 +89,7 @@ modify_retention() {
 		--entity-type topics \
 		--entity-name "$TOPIC_NAME" \
 		--add-config "retention.ms=$RETENTION_MS" \
-		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT"
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_INTERNAL_PORT"
 }
 
 describe_topic() {
@@ -95,12 +97,12 @@ describe_topic() {
 		--describe \
 		--entity-type topics \
 		--entity-name "$TOPIC_NAME" \
-		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT"
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_INTERNAL_PORT"
 }
 
 topic_exists() {
 	docker exec "$KAFKA_SERVICE" kafka-topics \
-		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_PORT" \
+		--bootstrap-server "$KAFKA_SERVICE:$KAFKA_INTERNAL_PORT" \
 		--list | grep -Fxq "$TOPIC_NAME"
 }
 
