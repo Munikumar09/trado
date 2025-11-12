@@ -1,0 +1,18 @@
+services:
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - 8188:8080     # open UI on localhost:8188
+
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:29092
+      DYNAMIC_CONFIG_ENABLED: 'true'
+
+    networks:
+      - kafka_network
+
+networks:
+  kafka_network:
+    external: true

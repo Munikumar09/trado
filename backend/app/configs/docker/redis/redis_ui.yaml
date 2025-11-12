@@ -1,0 +1,13 @@
+services:
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redis_ui
+    ports:
+      - 5540:5540
+    networks:
+      - redis_network
+    restart: unless-stopped
+
+networks:
+  redis_network:
+    external: true

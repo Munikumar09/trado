@@ -1,8 +1,10 @@
 #!/bin/bash
 
 # Redis configuration variables
-REDIS_COMPOSE_PATH="$ROOT_PATH/app/configs/docker/redis/redis.yaml"
-ENV_FILE_PATH="$ROOT_PATH/.env"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REDIS_COMPOSE_PATH="$SCRIPT_DIR/../../../app/configs/docker/redis/redis.yaml"
+ENV_FILE_PATH="$SCRIPT_DIR/../../../.env"
+NETWORK_NAME="redis_network"
 
 # Validate compose file existence
 if [ ! -f "$REDIS_COMPOSE_PATH" ]; then
@@ -16,6 +18,15 @@ PREVIOUS_LINE=$(awk '/image: redis/{print x; exit} {x=$0}' $REDIS_COMPOSE_PATH)
 # Extract the container name from the previous line
 REDIS_COMPOSE_SERVICE=$(echo $PREVIOUS_LINE | grep 'container_name:' | awk '{print $2}')
 
+ensure_network() {
+	if ! docker network inspect "$NETWORK_NAME" >/dev/null 2>&1; then
+		echo "🌐 Creating docker network: $NETWORK_NAME"
+		docker network create "$NETWORK_NAME"
+	else
+		echo "✅ Network '$NETWORK_NAME' already exists."
+	fi
+}
+
 # Function to check if a Docker container is running
 is_container_running() {
 	docker ps -f name=$1 --format '{{.Names}}' | grep -w $1 >/dev/null
@@ -25,6 +36,8 @@ is_container_running() {
 start_redis() {
 	if ! is_container_running $REDIS_COMPOSE_SERVICE; then
 		echo "Starting Redis container..."
+
+		ensure_network
 
 		# Start the Redis container and if it fails, return an error
 		if ! docker compose --env-file $ENV_FILE_PATH -f $REDIS_COMPOSE_PATH up -d; then
