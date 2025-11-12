@@ -426,7 +426,10 @@ setup_android_sdk() {
   # 'yes | sdkmanager --licenses' simulates pressing 'y' for all license prompts.
   # Redirected to /dev/null to keep output clean.
   echo_info "Accepting Android SDK licenses..."
-  yes | sdkmanager --licenses >/dev/null 2>&1
+  yes | sdkmanager --licenses >/dev/null 2>&1 ||{
+    echo_error "Failed to accept Android SDK licenses."
+    exit 1
+  }
 
 
   # --- 8. Install core Android SDK components ---
@@ -437,7 +440,10 @@ setup_android_sdk() {
   #   - build-tools;34.0.0: compilers and packaging tools
   echo_info "Installing essential Android SDK components..."
   sdkmanager --update >/dev/null 2>&1
-  sdkmanager "platform-tools" "emulator" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+  sdkmanager "platform-tools" "emulator" "platforms;android-34" "build-tools;34.0.0" >/dev/null || {
+    echo_error "Failed to install Android SDK components."
+    exit 1
+  }
 
 
   # --- 9. Detect system architecture for system image installation ---
