@@ -426,11 +426,10 @@ setup_android_sdk() {
   # 'yes | sdkmanager --licenses' simulates pressing 'y' for all license prompts.
   # Redirected to /dev/null to keep output clean.
   echo_info "Accepting Android SDK licenses..."
-  yes | sdkmanager --licenses >/dev/null 2>&1 ||{
+  yes | sdkmanager --licenses >/dev/null 2>&1 || {
     echo_error "Failed to accept Android SDK licenses."
     exit 1
   }
-
 
   # --- 8. Install core Android SDK components ---
   # These are the essential tools required for building and running Android apps.
