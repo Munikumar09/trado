@@ -6,7 +6,7 @@ services:
     ports:
       - 6379:6379
     networks:
-      - redis-net
+      - redis_network
     volumes:
       - redis_data:/data
     healthcheck:
@@ -20,6 +20,5 @@ volumes:
     driver: local
 
 networks:
-  redis-net:
-    name: redis-net
-    driver: bridge
+  redis_network:
+    external: true

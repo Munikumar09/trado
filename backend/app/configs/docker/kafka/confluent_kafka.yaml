@@ -1,0 +1,68 @@
+services:
+  kafka1:
+    container_name: kafka1
+    image: confluentinc/cp-kafka:7.7.0
+    hostname: kafka1
+
+    ports:
+      - 9092:9092
+
+    networks:
+      - kafka_network
+
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # -------------------------------
+      # ✅ Listener configuration
+      # -------------------------------
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        CONTROLLER:PLAINTEXT,
+        PLAINTEXT:PLAINTEXT,
+        PLAINTEXT_HOST:PLAINTEXT
+
+      # ✅ 3 listeners:
+      #   1) PLAINTEXT: internal broker
+      #   2) CONTROLLER: KRaft metadata
+      #   3) PLAINTEXT_HOST: exposed to host
+      KAFKA_LISTENERS: >
+        PLAINTEXT://kafka1:29092,
+        CONTROLLER://kafka1:29093,
+        PLAINTEXT_HOST://0.0.0.0:9092
+
+      # ✅ advertise internal + host listeners
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://kafka1:29092,
+        PLAINTEXT_HOST://localhost:9092
+
+      # ✅ KRaft settings
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:29093
+
+      # ✅ required for groups to work
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # ID required
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID:-MkU3OEVBNTcwNTJENDM2Qk}
+
+      # storage
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+
+      # tuning (optional)
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx512m
+      KAFKA_LOG_CLEANER_ENABLE: 'false'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+
+    volumes:
+      - kafka1_data:/var/lib/kafka/data
+
+volumes:
+  kafka1_data: null
+
+networks:
+  kafka_network:
+    external: true
