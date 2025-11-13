@@ -37,7 +37,7 @@ The backend provides:
 
 ## 📁 Project Structure
 
-```
+``` text
 backend/
 ├── app/
 │   ├── cache/              # Redis cache logic
@@ -119,7 +119,7 @@ Copy the environment variables from **Bitwarden** and paste them into a created 
 Enable pre-commit hooks for linting, formatting, and type checks:
 
 ```bash
-cd trado/dev_tools/.githooks
+cd ../dev_tools/.githooks
 ./setup_git_hooks.sh
 ```
 
@@ -130,18 +130,18 @@ cd trado/dev_tools/.githooks
 ### Start Required Services
 
 ```bash
-cd trado/backend/scripts
-./docker/docker_setup/ubuntu_setup.sh --install
-./docker/kafka/kafka_setup.sh --start
-./docker/postgres/postgres_server.sh --start
-./docker/redis/redis_server.sh --start
+cd ./scripts/docker
+./docker_setup/ubuntu_setup.sh --install
+./kafka/kafka_setup.sh --start
+./postgres/postgres_server.sh --start
+./redis/redis_server.sh --start
 ```
 
 ### Stop or Uninstall Services
 
 ```bash
-./docker/kafka/kafka_setup.sh --stop
-./docker/docker_setup/ubuntu_setup.sh --uninstall
+./kafka/kafka_setup.sh --stop
+./docker_setup/ubuntu_setup.sh --uninstall
 ```
 
 ---
@@ -191,7 +191,7 @@ pytest -v --disable-warnings
 
 ## 🧑‍💻 Maintainers
 
-**Muni Kumar**
-**Nagalakshmi**
+**Muni Kumar** (@Munikumar09)
+**Nagalakshmi** (@Nagalakshmi136)
 
 ---
