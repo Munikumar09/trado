@@ -131,17 +131,17 @@ cd trado/dev_tools/.githooks
 
 ```bash
 cd trado/backend/scripts
-./docker/ubuntu_setup.sh --install
-./kafka/kafka_setup.sh --start
-./postgres/postgres_server.sh --start
-./redis/redis_server.sh --start
+./docker/docker_setup/ubuntu_setup.sh --install
+./docker/kafka/kafka_setup.sh --start
+./docker/postgres/postgres_server.sh --start
+./docker/redis/redis_server.sh --start
 ```
 
 ### Stop or Uninstall Services
 
 ```bash
-./kafka/kafka_setup.sh --stop
-./docker/ubuntu_setup.sh --uninstall
+./docker/kafka/kafka_setup.sh --stop
+./docker/docker_setup/ubuntu_setup.sh --uninstall
 ```
 
 ---
