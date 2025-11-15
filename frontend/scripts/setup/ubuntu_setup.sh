@@ -329,7 +329,7 @@ ensure_java() {
 		# --- 5. Persist Java environment variables in ~/.bashrc ---
 
 		append_to_bashrc_if_missing \
-			"JAVA_HOME" \
+			">>> Java Environment Variables" \
 			"Configuring Java environment variables in ~/.bashrc..." \
 			"$JAVA_ENV"
 	fi
