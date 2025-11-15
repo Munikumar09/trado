@@ -301,6 +301,8 @@ if [ -n "$FRONTEND_CHANGED" ]; then
 	echo -e "\033[1;34m➡️ Running checks for frontend...\033[0m"
 	check_format_dart_files "$FRONTEND_CHANGED"
 	lint_check_dart_files "$FRONTEND_CHANGED"
+	check_format_bash_files "$FRONTEND_CHANGED"
+	check_format_yaml_files "$FRONTEND_CHANGED"
 fi
 
 #############################
